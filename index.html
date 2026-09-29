@@ -1,0 +1,2126 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e1438">
+<title>Moje kampaň</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&display=swap">
+<style>
+/* =====================================================================
+   Base. Colours come from the JS PALETTE (exported as --c-KEY vars).
+   --u is one game pixel in CSS px, set from JS so that it is always a
+   whole number of device pixels.
+   ===================================================================== */
+:root { --u: 2px; --pb: calc(var(--u) * 13); }
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; background: #0e1438; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--c-NIGHT_1, #0e1438);
+  color: var(--c-WHITE, #f4f0e2);
+  font-family: 'Pixelify Sans', monospace;
+  font-size: 18px;
+  line-height: 1.3;
+  overflow-x: hidden;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  -webkit-tap-highlight-color: transparent;
+}
+body.booting { visibility: hidden; }
+body.font-fallback { font-size: 15px; }
+[hidden] { display: none !important; }
+button { font: inherit; color: inherit; margin: 0; }
+.px { display: block; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges; image-rendering: pixelated; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+:focus { outline: none; }
+:focus-visible { outline: var(--u) solid var(--c-WHITE); outline-offset: var(--u); }
+
+/* Fixed pixel canvases: background scene and transition clouds */
+#bgwrap, #fxwrap { position: fixed; inset: 0; overflow: hidden; }
+#bgwrap { z-index: 0; pointer-events: none; }
+#fxwrap { z-index: 60; pointer-events: none; display: none; }
+#fxwrap.active { display: block; pointer-events: auto; cursor: progress; }
+.screen { position: relative; z-index: 1; }
+
+/* =====================================================================
+   Pixel box: hard 1-pixel edge with notched corners + bevel.
+   ===================================================================== */
+.pbox {
+  --bg: var(--c-NIGHT_2); --hi: var(--c-NIGHT_3); --lo: var(--c-NIGHT_1); --edge: var(--c-NIGHT_0);
+  background-color: var(--bg);
+  box-shadow:
+    inset var(--u) var(--u) 0 0 var(--hi),
+    inset calc(var(--u) * -1) calc(var(--u) * -1) 0 0 var(--lo),
+    0 calc(var(--u) * -1) 0 0 var(--edge),
+    0 var(--u) 0 0 var(--edge),
+    calc(var(--u) * -1) 0 0 0 var(--edge),
+    var(--u) 0 0 0 var(--edge);
+}
+
+/* =====================================================================
+   Screen 1 – Campaign
+   ===================================================================== */
+.hero { position: relative; overflow: hidden; margin: 0; }
+.hero canvas { margin: 0 auto; }
+.wrap { max-width: 880px; margin: 0 auto; padding: 0 calc(var(--u) * 5) calc(var(--u) * 48); }
+.subtitle {
+  margin: calc(var(--u) * 2) 0 calc(var(--u) * 8);
+  text-align: center; color: var(--c-CLOUD_L); font-size: 1.1em;
+}
+
+/* Ambition meter (sticky so it stays visible while choosing) */
+.ambition {
+  --bg: var(--c-NIGHT_1); --hi: var(--c-NIGHT_3); --lo: var(--c-NIGHT_0); --edge: var(--c-GOLD_D);
+  --amb: var(--c-GREEN);
+  position: sticky; top: calc(var(--u) * 3); z-index: 5;
+  margin: 0 var(--u) calc(var(--u) * 9);
+  padding: calc(var(--u) * 4) calc(var(--u) * 6) calc(var(--u) * 3);
+}
+.amb-head { display: flex; justify-content: space-between; align-items: baseline; gap: calc(var(--u) * 4); }
+.amb-title { color: var(--c-GOLD); font-weight: 700; font-size: 1.1em; }
+.amb-num { color: var(--amb); font-weight: 700; white-space: nowrap; }
+.amb-num small { color: var(--c-CLOUD_M); font-weight: 400; font-size: .8em; }
+.amb-bar {
+  display: flex; align-items: stretch; gap: var(--u);
+  margin: calc(var(--u) * 3) 0 calc(var(--u) * 2);
+  padding: var(--u); background: var(--c-NIGHT_0);
+}
+.amb-seg { flex: 1 1 0; min-width: 0; height: calc(var(--u) * 5); background: var(--c-NIGHT_2); }
+.amb-seg.full { background: var(--amb); }
+.amb-seg.part {
+  background: repeating-conic-gradient(var(--amb) 0 25%, var(--c-NIGHT_2) 0 50%) 0 0 / calc(var(--u) * 2) calc(var(--u) * 2);
+}
+.amb-mark {
+  flex: none; width: var(--u); margin: calc(var(--u) * -3) 0;
+  background: var(--c-GOLD);
+  box-shadow: calc(var(--u) * -1) 0 0 0 var(--c-NIGHT_0), var(--u) 0 0 0 var(--c-NIGHT_0);
+}
+.amb-foot { display: flex; justify-content: space-between; align-items: center; gap: calc(var(--u) * 4); font-size: .85em; color: var(--c-CLOUD_M); }
+.linkbtn {
+  border: 0; background: none; padding: var(--u) 0; cursor: pointer; color: var(--c-CLOUD_M);
+  text-decoration: underline; text-decoration-thickness: var(--u); text-underline-offset: calc(var(--u) * 2);
+}
+.linkbtn:hover { color: var(--c-WHITE); }
+.linkbtn.confirm { color: var(--c-RED); }
+.amb-warn {
+  display: flex; align-items: center; gap: calc(var(--u) * 3);
+  margin: calc(var(--u) * 2) 0 0; color: var(--c-RED); font-weight: 700;
+}
+.amb-warn::before {
+  content: '!'; flex: none; display: inline-grid; place-items: center;
+  width: calc(var(--u) * 8); height: calc(var(--u) * 8);
+  background: var(--c-RED); color: var(--c-WHITE); font-size: .9em; line-height: 1;
+}
+
+/* Categories */
+.cat { margin: 0 var(--u) calc(var(--u) * 8); }
+.cat-head {
+  --bg: var(--c-NIGHT_3); --hi: var(--c-NIGHT_4); --lo: var(--c-NIGHT_2); --edge: var(--c-NIGHT_0);
+  display: flex; align-items: center; gap: calc(var(--u) * 5);
+  width: 100%; padding: calc(var(--u) * 3) calc(var(--u) * 5);
+  border: 0; cursor: pointer; text-align: left; color: var(--c-GOLD);
+}
+.cat-head:hover { --bg: var(--c-NIGHT_4); --hi: var(--c-BLUE); }
+.icon16 { flex: none; width: calc(var(--u) * 16); height: calc(var(--u) * 16); }
+.cat-name { flex: 1 1 auto; min-width: 0; font-size: 1.15em; font-weight: 700; }
+.cat-sum { flex: none; font-size: .8em; color: var(--c-CLOUD_L); white-space: nowrap; }
+.cat-toggle { position: relative; flex: none; width: calc(var(--u) * 5); height: calc(var(--u) * 5); }
+.cat-toggle::before, .cat-toggle::after { content: ''; position: absolute; background: var(--c-GOLD); }
+.cat-toggle::before { left: 0; right: 0; top: calc(var(--u) * 2); height: var(--u); }
+.cat-toggle::after { top: 0; bottom: 0; left: calc(var(--u) * 2); width: var(--u); }
+.cat-head[aria-expanded="true"] .cat-toggle::after { display: none; }
+.cat-body { padding-top: calc(var(--u) * 2); }
+
+/* Topic cards */
+.card { margin: calc(var(--u) * 4) var(--u) calc(var(--u) * 5); padding: calc(var(--u) * 5) calc(var(--u) * 6) calc(var(--u) * 5); }
+.card:not(.off) { --edge: var(--c-GOLD_D); }
+.card-title { margin: 0 0 calc(var(--u) * 4); font-size: 1.05em; font-weight: 600; color: var(--c-WHITE); overflow-wrap: anywhere; }
+.crow { display: flex; align-items: center; flex-wrap: wrap; gap: calc(var(--u) * 3) calc(var(--u) * 5); }
+.crow + .crow { margin-top: calc(var(--u) * 4); align-items: flex-start; }
+.lbl { flex: none; width: 5.2em; color: var(--c-CLOUD_M); font-size: .85em; }
+.crow + .crow .lbl { padding-top: calc(var(--u) * 2); }
+.pblocks { display: flex; gap: calc(var(--u) * 2); }
+.pb {
+  width: var(--pb); height: var(--pb); padding: 0; border: 0; cursor: pointer;
+  background-color: var(--c-NIGHT_1);
+  box-shadow: inset 0 0 0 var(--u) var(--c-NIGHT_0);
+}
+.pb:hover { background-color: var(--c-NIGHT_3); }
+.pb.on {
+  background-color: var(--c-GOLD);
+  box-shadow:
+    inset 0 0 0 var(--u) var(--c-BROWN),
+    inset calc(var(--u) * 2) calc(var(--u) * 2) 0 0 var(--c-GOLD_L),
+    inset calc(var(--u) * -2) calc(var(--u) * -2) 0 0 var(--c-GOLD_D);
+}
+.pb.on:hover { background-color: var(--c-GOLD_L); }
+.pb0 {
+  background-image: var(--x-dim);
+  background-size: calc(var(--u) * 13) calc(var(--u) * 13);
+  background-position: center; background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+.pb0.sel { background-color: var(--c-MAROON); background-image: var(--x-on); }
+.pb0.sel:hover { background-color: var(--c-RED); }
+.ptext { color: var(--c-GOLD); font-size: .9em; }
+.card.off .ptext { color: var(--c-CLOUD_M); }
+
+.stance { flex: 1 1 14em; min-width: 0; }
+.slider {
+  position: relative; height: calc(var(--u) * 10);
+  margin: 0 calc(var(--u) * 4); cursor: pointer; touch-action: pan-y;
+}
+.slider .track {
+  position: absolute; left: 0; right: 0; top: calc(var(--u) * 4); height: calc(var(--u) * 2);
+  background: var(--c-NIGHT_0); box-shadow: 0 var(--u) 0 0 var(--c-NIGHT_3);
+}
+.slider .notch {
+  position: absolute; top: calc(var(--u) * 3); width: calc(var(--u) * 2); height: calc(var(--u) * 4);
+  margin-left: calc(var(--u) * -1); background: var(--c-CLOUD_S);
+}
+.slider .notch.mid { top: calc(var(--u) * 2); height: calc(var(--u) * 6); background: var(--c-CLOUD_M); }
+.slider .knob {
+  position: absolute; top: var(--u); width: calc(var(--u) * 6); height: calc(var(--u) * 8);
+  margin-left: calc(var(--u) * -3);
+  background: var(--c-GOLD);
+  box-shadow:
+    inset 0 0 0 var(--u) var(--c-BROWN),
+    inset calc(var(--u) * 2) calc(var(--u) * 2) 0 0 var(--c-GOLD_L),
+    inset calc(var(--u) * -2) calc(var(--u) * -2) 0 0 var(--c-GOLD_D);
+}
+.slider:hover .knob { background: var(--c-GOLD_L); }
+.slider:focus-visible { outline: none; }
+.slider:focus-visible .knob { outline: var(--u) solid var(--c-WHITE); outline-offset: var(--u); }
+.poles { display: flex; justify-content: space-between; gap: calc(var(--u) * 5); margin-top: calc(var(--u) * 2); font-size: .82em; }
+.poles button {
+  max-width: 48%; padding: 0; border: 0; background: none; cursor: pointer;
+  color: var(--c-CLOUD_M); text-align: left; overflow-wrap: anywhere;
+}
+.poles button.r { text-align: right; }
+.poles button:hover { color: var(--c-WHITE); }
+.poles button.act { color: var(--c-GOLD); }
+.card.off .slider .knob { background: var(--c-INK); box-shadow: inset 0 0 0 var(--u) var(--c-NIGHT_0); }
+.card.off .slider .notch { background: var(--c-NIGHT_3); }
+.card.off .poles button, .card.off .poles button.act, .card.off .lbl-stance { color: var(--c-INK); }
+
+/* Bottom dock with the big button */
+.dock {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  display: flex; justify-content: center; align-items: flex-end;
+  padding: calc(var(--u) * 8) calc(var(--u) * 4) calc(var(--u) * 6 + env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+}
+.dock::before {
+  content: ''; position: absolute; inset: 0;
+  background:
+    linear-gradient(var(--c-NIGHT_0), var(--c-NIGHT_0)) left bottom / 100% 55% no-repeat,
+    var(--dither) left top / calc(var(--u) * 2) calc(var(--u) * 2) repeat;
+  image-rendering: pixelated;
+}
+.dock > * { position: relative; pointer-events: auto; }
+.dock.show { animation: pixfade .5s steps(4, end) both; }
+
+.btn-play, .btn {
+  --face: var(--c-GOLD); --shine: var(--c-GOLD_L);
+  border: 0; cursor: pointer; margin-bottom: calc(var(--u) * 3);
+  background: var(--face); color: var(--c-NIGHT_1);
+  box-shadow:
+    inset var(--u) var(--u) 0 0 var(--shine),
+    inset calc(var(--u) * -1) calc(var(--u) * -1) 0 0 var(--c-GOLD_D),
+    0 calc(var(--u) * -1) 0 0 var(--c-NIGHT_0),
+    calc(var(--u) * -1) 0 0 0 var(--c-NIGHT_0),
+    var(--u) 0 0 0 var(--c-NIGHT_0),
+    0 var(--u) 0 0 var(--c-NIGHT_0),
+    0 calc(var(--u) * 2) 0 0 var(--c-BROWN),
+    0 calc(var(--u) * 3) 0 0 var(--c-NIGHT_0);
+}
+.btn-play:hover, .btn:hover { --face: var(--c-GOLD_L); --shine: var(--c-WHITE); }
+.btn-play:active, .btn-play.pressed, .btn:active, .btn.pressed {
+  transform: translateY(calc(var(--u) * 2));
+  box-shadow:
+    inset var(--u) var(--u) 0 0 var(--shine),
+    inset calc(var(--u) * -1) calc(var(--u) * -1) 0 0 var(--c-GOLD_D),
+    0 calc(var(--u) * -1) 0 0 var(--c-NIGHT_0),
+    calc(var(--u) * -1) 0 0 0 var(--c-NIGHT_0),
+    var(--u) 0 0 0 var(--c-NIGHT_0),
+    0 var(--u) 0 0 var(--c-NIGHT_0);
+}
+.btn-play { padding: calc(var(--u) * 4) calc(var(--u) * 10); }
+.btn-play canvas { width: calc(var(--u) * 35); height: calc(var(--u) * 14); }
+.btn { padding: calc(var(--u) * 3) calc(var(--u) * 8); font-weight: 700; font-size: 1.05em; }
+
+.btn-mute {
+  --bg: var(--c-NIGHT_1); --hi: var(--c-NIGHT_3); --lo: var(--c-NIGHT_0); --edge: var(--c-NIGHT_0);
+  position: fixed; z-index: 30;
+  right: calc(var(--u) * 5); bottom: calc(var(--u) * 9 + env(safe-area-inset-bottom, 0px));
+  width: calc(var(--u) * 13); height: calc(var(--u) * 13); padding: 0; border: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.btn-mute:hover { --bg: var(--c-NIGHT_3); --hi: var(--c-NIGHT_4); }
+.btn-mute canvas { width: calc(var(--u) * 9); height: calc(var(--u) * 9); }
+
+/* =====================================================================
+   Screen 2 – World (temporary reactions panel)
+   ===================================================================== */
+.world-wrap { max-width: 920px; margin: 0 auto; padding: calc(var(--u) * 12) calc(var(--u) * 5) calc(var(--u) * 48); }
+.panel {
+  --bg: var(--c-NIGHT_1); --hi: var(--c-NIGHT_3); --lo: var(--c-NIGHT_0); --edge: var(--c-GOLD_D);
+  margin: var(--u); padding: calc(var(--u) * 7) calc(var(--u) * 7) calc(var(--u) * 6);
+}
+.panel.show { animation: pixfade .6s steps(4, end) both; }
+@keyframes pixfade {
+  from { opacity: 0; transform: translateY(calc(var(--u) * 4)); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.panel h2 { margin: 0; text-align: center; color: var(--c-GOLD); font-size: 1.45em; line-height: 1.15; }
+.panel-sub { margin: calc(var(--u) * 2) 0 0; text-align: center; color: var(--c-CLOUD_M); font-size: .9em; }
+.summary {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: calc(var(--u) * 3) calc(var(--u) * 8);
+  margin: calc(var(--u) * 5) 0 calc(var(--u) * 7); font-size: .9em;
+}
+.summary span { display: inline-flex; align-items: center; gap: calc(var(--u) * 2); }
+.face8 { flex: none; width: calc(var(--u) * 8); height: calc(var(--u) * 8); }
+.flag { flex: none; width: calc(var(--u) * 15); height: calc(var(--u) * 9); }
+.cols { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: calc(var(--u) * 8); }
+.col h3 {
+  margin: 0 0 calc(var(--u) * 3); padding-bottom: calc(var(--u) * 2);
+  color: var(--c-GOLD_L); font-size: 1.05em; box-shadow: 0 var(--u) 0 0 var(--c-NIGHT_3);
+}
+.rows { list-style: none; margin: 0; padding: 0; }
+.row {
+  display: grid; align-items: center; gap: calc(var(--u) * 4);
+  grid-template-columns: calc(var(--u) * 15) minmax(0, 1fr) calc(var(--u) * 27) calc(var(--u) * 8);
+  width: 100%; padding: calc(var(--u) * 2) calc(var(--u) * 2);
+  border: 0; background: transparent; text-align: left; cursor: pointer;
+}
+.row:hover, .row.active { background: var(--c-NIGHT_2); }
+.row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .95em; }
+.bar { display: block; height: calc(var(--u) * 5); padding: var(--u); background: var(--c-NIGHT_0); }
+.bar i { display: block; height: 100%; width: calc(var(--u) * var(--n, 0)); background: var(--mood, var(--c-YELLOW)); }
+.panel-hint { margin: calc(var(--u) * 7) 0 0; text-align: center; color: var(--c-CLOUD_M); font-size: .82em; }
+.panel-warn { margin: calc(var(--u) * 2) 0 0; text-align: center; color: var(--c-ORANGE); font-size: .82em; }
+
+.tip {
+  --bg: var(--c-NIGHT_0); --hi: var(--c-NIGHT_3); --lo: var(--c-BLACK); --edge: var(--c-GOLD_D);
+  position: absolute; z-index: 40; width: max-content; max-width: min(320px, calc(100vw - 32px));
+  padding: calc(var(--u) * 4) calc(var(--u) * 5); font-size: .85em; line-height: 1.35; pointer-events: none;
+}
+.tip h4 { display: flex; align-items: center; gap: calc(var(--u) * 3); margin: 0; color: var(--c-GOLD); font-size: 1.15em; }
+.tip h4 small { color: var(--c-CLOUD_M); font-size: .75em; font-weight: 400; }
+.tip p { margin: calc(var(--u) * 2) 0 0; }
+.tip .mood { display: flex; align-items: center; gap: calc(var(--u) * 3); }
+.tip .pos { color: var(--c-LIME); }
+.tip .neg { color: var(--c-RED); }
+.tip .key { color: var(--c-CLOUD_M); }
+
+/* =====================================================================
+   Narrow screens (phones ~380 px)
+   ===================================================================== */
+@media (max-width: 720px) {
+  .cols { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  body { font-size: 16px; }
+  body.font-fallback { font-size: 14px; }
+  :root { --pb: calc(var(--u) * 15); }
+  .lbl { width: 100%; }
+  .crow + .crow .lbl { padding-top: 0; }
+  .stance { flex-basis: 100%; }
+  .card { padding: calc(var(--u) * 5) calc(var(--u) * 5); }
+  .cat-head { gap: calc(var(--u) * 4); padding: calc(var(--u) * 3) calc(var(--u) * 4); }
+  .cat-name { font-size: 1.05em; }
+  .panel { padding: calc(var(--u) * 6) calc(var(--u) * 4) calc(var(--u) * 5); }
+  .row { gap: calc(var(--u) * 3); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel.show, .dock.show { animation-duration: .01s; }
+}
+</style>
+</head>
+<body class="booting">
+
+<div id="bgwrap" aria-hidden="true"><canvas id="bg" class="px"></canvas></div>
+
+<!-- ============================ SCREEN 1 ============================ -->
+<main id="screen-campaign" class="screen">
+  <header class="hero">
+    <canvas id="hero-canvas" class="px" aria-hidden="true"></canvas>
+    <h1 class="sr-only">MOJE KAMPAŇ</h1>
+  </header>
+  <div class="wrap">
+    <p class="subtitle">Rozhodni, co slíbíš Evropě. Pak to budeš muset splnit.</p>
+
+    <section class="ambition pbox" id="ambition" aria-label="Ambice kampaně">
+      <div class="amb-head">
+        <span class="amb-title">Ambice kampaně</span>
+        <span class="amb-num"><span id="amb-sum">0</span> <small>/ <span id="amb-cap">35</span> bodů</small></span>
+      </div>
+      <div class="amb-bar" id="amb-bar" aria-hidden="true"></div>
+      <div class="amb-foot">
+        <span id="amb-count">Zatím žádný slib</span>
+        <button type="button" class="linkbtn" id="btn-reset">Vynulovat</button>
+      </div>
+      <p class="amb-warn" id="amb-warn" role="status" hidden>Tohle za jedno volební období nestihneš.</p>
+    </section>
+
+    <div id="categories"></div>
+  </div>
+  <div class="dock">
+    <button type="button" class="btn-play" id="btn-play" aria-label="HRÁT"><canvas id="play-label" class="px" aria-hidden="true"></canvas></button>
+  </div>
+</main>
+
+<!-- ============================ SCREEN 2 ============================ -->
+<main id="screen-world" class="screen" hidden>
+  <div class="world-wrap">
+    <section class="panel pbox" id="panel" aria-labelledby="panel-title" hidden>
+      <h2 id="panel-title" tabindex="-1">Reakce světa na tvou kampaň</h2>
+      <p class="panel-sub" id="panel-sub"></p>
+      <div class="summary" id="summary"></div>
+      <div class="cols">
+        <div class="col"><h3>Evropská unie</h3><ol class="rows" id="list-eu"></ol></div>
+        <div class="col"><h3>Svět</h3><ol class="rows" id="list-world"></ol></div>
+      </div>
+      <p class="panel-hint">Najeď myší na stát nebo na něj ťukni – uvidíš, co se mu líbí a co mu vadí.</p>
+      <p class="panel-warn">Pozor: kdo je teď nejspokojenější, toho nesplněný slib zabolí nejvíc.</p>
+    </section>
+  </div>
+  <div class="dock" id="world-dock" hidden>
+    <button type="button" class="btn" id="btn-back">Zpět ke kampani</button>
+  </div>
+</main>
+
+<div id="tip" class="tip pbox" role="tooltip" hidden></div>
+<button type="button" id="btn-mute" class="btn-mute pbox" aria-label="Vypnout zvuk" aria-pressed="false"><canvas id="mute-icon" class="px" width="9" height="9" aria-hidden="true"></canvas></button>
+<div id="fxwrap" aria-hidden="true"><canvas id="fx" class="px"></canvas></div>
+
+<script>
+'use strict';
+/* =======================================================================
+   MOJE KAMPAŇ – pixel-art EU political strategy game.
+   Phase 1: campaign screen -> cloud transition -> world reactions panel.
+
+   Extension points for later phases:
+   - Phase 2 (map): WorldScene.renderBackground() draws the black screen;
+     replace it with the rasterised map. ACTORS carry ISO numeric codes
+     (`iso`) matching world-atlas TopoJSON ids.
+   - Phase 3 (turns): state.turn / state.credibility / actor.trust and
+     actor.startMood are already in place; CONFIG.PHASE3 holds tuning.
+     Reactions.evaluate() is a pure function you can reuse per turn.
+   ======================================================================= */
+
+/* ============================== CONFIG ============================== */
+const CONFIG = {
+  REALISTIC_CAPACITY: 35,     // sum of priorities one term can realistically deliver
+  MAX_PRIORITY: 5,
+  MOOD_SCALE: 1.5,
+  IGNORED_PENALTY: 4,         // "they ignore what matters to us"
+  IGNORED_WEIGHT_MIN: 3,      // weight at which ignoring a topic hurts
+  DEFAULT_WEIGHT: 0.5,        // topics not listed in an actor's interests
+  DEFAULT_STANCE: 0,
+  BASELINE: 50,
+  AMBITION_SEGMENT: 5,        // priority points per segment of the ambition meter
+
+  // Pixel rendering: the low-res buffer aims for ~640x360 and is scaled
+  // up by a whole number of *device* pixels.
+  TARGET_W: 640,
+  TARGET_H: 360,
+  MIN_PIXEL_CSS: 2,
+
+  // Cloud transition timing (seconds)
+  T_IN: 1.0,
+  T_HOLD: 0.3,
+  T_OUT: 1.2,
+  PANEL_DELAY: 1.3,           // world panel appears this long after the scene swap
+
+  SAVE_KEY: 'mojeKampan.v1',
+
+  // Reserved for Phase 3 (not used yet)
+  PHASE3: {
+    TERM_TURNS: 10,
+    CAPITAL_PER_TURN: 6,
+    CHECKPOINT_EVERY: 2,
+    START_TRUST: 50,
+    START_CREDIBILITY: 100,
+    SHORTFALL_MULT: 2,        // x (1 + startMood / 100)
+    OVERDELIVERY_MULT: 0.5,
+  },
+};
+
+/* ============================== PALETTE ============================= */
+const PALETTE = {
+  BLACK:   '#000000',
+  NIGHT_0: '#070919',
+  NIGHT_1: '#0e1438',   // deep night navy
+  NIGHT_2: '#18215a',
+  NIGHT_3: '#27357f',
+  NIGHT_4: '#3b4fa8',
+  BLUE:    '#2458c8',
+  SKY:     '#62a8ec',
+  GOLD_D:  '#a36d00',
+  GOLD:    '#ffcc00',   // EU gold
+  GOLD_L:  '#fff1a0',
+  BROWN:   '#3e2406',
+  WHITE:   '#f4f0e2',   // off-white
+  CLOUD_L: '#d3d5e4',   // cloud greys
+  CLOUD_M: '#a2a6c4',
+  CLOUD_S: '#6f7399',
+  INK:     '#4a5080',
+  RED:     '#dc3545',
+  MAROON:  '#7c1d2b',
+  ORANGE:  '#f08326',
+  YELLOW:  '#eed43c',
+  LIME:    '#93d04c',
+  GREEN:   '#2f9e4f',
+  DKGREEN: '#1a6634',
+};
+
+/* ============================ CATEGORIES ============================ */
+const CATEGORIES = [
+  { id: 'economy',  name: 'Ekonomika a konkurence', icon: 'coin' },
+  { id: 'climate',  name: 'Klima a energie',        icon: 'bolt' },
+  { id: 'food',     name: 'Potraviny a venkov',     icon: 'apple' },
+  { id: 'security', name: 'Bezpečnost a hranice',   icon: 'shield' },
+  { id: 'society',  name: 'Společnost a zdraví',    icon: 'heart' },
+  { id: 'regions',  name: 'Regiony a propojení',    icon: 'train' },
+  { id: 'future',   name: 'Budoucnost Evropy',      icon: 'rocket' },
+];
+
+/* ============================== TOPICS ============================== */
+// poles[0] = stance -2, poles[1] = stance +2
+const TOPICS = [
+  { id: 'china_india_usa',    cat: 'economy',  name: 'Konkurence Číny, Indie a USA', short: 'Konkurence velmocí', poles: ['Otevřený trh', 'Ochrana evropského průmyslu'] },
+  { id: 'sustainable_growth', cat: 'economy',  name: 'Udržitelný ekonomický rozvoj', short: 'Udržitelný rozvoj', poles: ['Růst na prvním místě', 'Udržitelnost na prvním místě'] },
+  { id: 'diversification',    cat: 'economy',  name: 'Diverzifikace zdrojů (čipy, maso…)', short: 'Diverzifikace zdrojů', poles: ['Nakupovat nejlevněji ve světě', 'Vyrábět v Evropě'] },
+  { id: 'minerals',           cat: 'economy',  name: 'Nerostné bohatství', short: 'Nerostné bohatství', poles: ['Dovážet', 'Těžit v Evropě'] },
+  { id: 'trade_deals',        cat: 'economy',  name: 'Nové obchodní smlouvy (Mercosur)', short: 'Obchodní smlouvy', poles: ['Chránit domácí producenty', 'Volný obchod'] },
+
+  { id: 'fossil_exit',        cat: 'climate',  name: 'Odstup od fosilních paliv', short: 'Fosilní paliva', poles: ['Pomalu a levně', 'Rychle a ambiciózně'] },
+  { id: 'energy_mix',         cat: 'climate',  name: 'Energetická transformace', short: 'Energetika', poles: ['Jádro', 'Obnovitelné zdroje'] },
+  { id: 'green_deal',         cat: 'climate',  name: 'Green Deal', short: 'Green Deal', poles: ['Zmírnit', 'Posílit'] },
+  { id: 'alt_propulsion',     cat: 'climate',  name: 'Alternativní pohony', short: 'Alternativní pohony', poles: ['Technologická neutralita', 'Konec spalovacích motorů'] },
+
+  { id: 'agriculture',        cat: 'food',     name: 'Zemědělství', short: 'Zemědělství', poles: ['Méně dotací, víc trhu', 'Silná podpora farmářů'] },
+  { id: 'fisheries',          cat: 'food',     name: 'Rybolov', short: 'Rybolov', poles: ['Volnější kvóty pro rybáře', 'Přísná ochrana moří'] },
+
+  { id: 'security',           cat: 'security', name: 'Bezpečnost', short: 'Bezpečnost', poles: ['Diplomacie a nízké výdaje', 'Silné zbrojení'] },
+  { id: 'migration',          cat: 'security', name: 'Migrace', short: 'Migrace', poles: ['Ochrana hranic', 'Solidarita a přijímání'] },
+
+  { id: 'drugs',              cat: 'society',  name: 'Prevence drog', short: 'Drogy', poles: ['Represe', 'Prevence a snižování rizik'] },
+  { id: 'alcohol',            cat: 'society',  name: 'Alkohol', short: 'Alkohol', poles: ['Volnost', 'Přísnější regulace'] },
+  { id: 'mental_health',      cat: 'society',  name: 'Prevence duševního zdraví', short: 'Duševní zdraví', poles: ['Národní záležitost', 'Celoevropský program'] },
+  { id: 'demography',         cat: 'society',  name: 'Demografie (stárnutí populace)', short: 'Demografie', poles: ['Podpora porodnosti', 'Pracovní migrace'] },
+
+  { id: 'transport',          cat: 'regions',  name: 'Dopravní infrastruktura (rychlovlaky, dálnice, letiště)', short: 'Doprava', poles: ['Silnice a letectví', 'Rychlovlaky a železnice'] },
+  { id: 'cohesion',           cat: 'regions',  name: 'Kohezní politika', short: 'Kohezní politika', poles: ['Méně přerozdělování', 'Víc pro chudší regiony'] },
+
+  { id: 'federalization',     cat: 'future',   name: 'Federalizace Evropy', short: 'Federalizace', poles: ['Silné národní státy', 'Evropská federace'] },
+  { id: 'space',              cat: 'future',   name: 'Evropa a vesmír', short: 'Vesmír', poles: ['Národní programy', 'Společný evropský program'] },
+];
+
+/* ============================== ACTORS ============================== */
+// Simplified game profiles, not political statements.
+// interests: "topic stance/weight" (stance -2..+2, weight 1..3).
+// All unlisted topics: weight CONFIG.DEFAULT_WEIGHT, stance CONFIG.DEFAULT_STANCE.
+// flag: 2-3 palette keys, flagStyle: pixel layout (see drawFlag).
+// iso: ISO 3166-1 numeric (= world-atlas TopoJSON id) for the Phase 2 map.
+const ACTORS = [
+  // ---- European Union ----
+  { id: 'be', name: 'Belgie',      group: 'EU', iso: '056', baseline: 50, flagStyle: 'v3', flag: ['BLACK', 'GOLD', 'RED'],
+    interests: I('federalization +2/3, transport +2/2, green_deal +1/2, migration +1/1') },
+  { id: 'bg', name: 'Bulharsko',   group: 'EU', iso: '100', baseline: 50, flagStyle: 'h3', flag: ['WHITE', 'GREEN', 'RED'],
+    interests: I('cohesion +2/3, fossil_exit -2/2, agriculture +1/2, migration -1/2, security +1/1') },
+  { id: 'cz', name: 'Česko',       group: 'EU', iso: '203', baseline: 50, flagStyle: 'cz', flag: ['WHITE', 'RED', 'BLUE'],
+    interests: I('alt_propulsion -2/3, energy_mix -2/2, migration -2/2, federalization -1/2, transport +2/1') },
+  { id: 'dk', name: 'Dánsko',      group: 'EU', iso: '208', baseline: 50, flagStyle: 'nordic', flag: ['RED', 'WHITE'],
+    interests: I('migration -2/2, cohesion -2/2, green_deal +2/2') },
+  { id: 'ee', name: 'Estonsko',    group: 'EU', iso: '233', baseline: 50, flagStyle: 'h3', flag: ['BLUE', 'BLACK', 'WHITE'],
+    interests: I('security +2/3, fossil_exit +1/2') },
+  { id: 'fi', name: 'Finsko',      group: 'EU', iso: '246', baseline: 50, flagStyle: 'nordic', flag: ['WHITE', 'BLUE'],
+    interests: I('security +2/3, cohesion -1/2, green_deal +1/1') },
+  { id: 'fr', name: 'Francie',     group: 'EU', iso: '250', baseline: 50, flagStyle: 'v3', flag: ['BLUE', 'WHITE', 'RED'],
+    interests: I('trade_deals -2/3, agriculture +2/3, energy_mix -2/3, space +2/3, china_india_usa +1/2') },
+  { id: 'hr', name: 'Chorvatsko',  group: 'EU', iso: '191', baseline: 50, flagStyle: 'croatia', flag: ['RED', 'WHITE', 'BLUE'],
+    interests: I('cohesion +2/3, migration -1/2, fisheries -1/2, transport -1/1') },
+  { id: 'ie', name: 'Irsko',       group: 'EU', iso: '372', baseline: 50, flagStyle: 'v3', flag: ['GREEN', 'WHITE', 'ORANGE'],
+    interests: I('agriculture +2/3, trade_deals -2/3, security -2/2') },
+  { id: 'it', name: 'Itálie',      group: 'EU', iso: '380', baseline: 50, flagStyle: 'v3', flag: ['GREEN', 'WHITE', 'RED'],
+    interests: I('migration -1/3, cohesion +2/2, agriculture +1/2') },
+  { id: 'cy', name: 'Kypr',        group: 'EU', iso: '196', baseline: 50, flagStyle: 'cyprus', flag: ['WHITE', 'ORANGE', 'GREEN'],
+    interests: I('migration -1/3, security +1/2, cohesion +1/2, fisheries -1/1') },
+  { id: 'lt', name: 'Litva',       group: 'EU', iso: '440', baseline: 50, flagStyle: 'h3', flag: ['GOLD', 'GREEN', 'RED'],
+    interests: I('security +2/3, fossil_exit +1/2') },
+  { id: 'lv', name: 'Lotyšsko',    group: 'EU', iso: '428', baseline: 50, flagStyle: 'h3', flag: ['MAROON', 'WHITE', 'MAROON'],
+    interests: I('security +2/3, fossil_exit +1/2') },
+  { id: 'lu', name: 'Lucembursko', group: 'EU', iso: '442', baseline: 50, flagStyle: 'h3', flag: ['RED', 'WHITE', 'SKY'],
+    interests: I('federalization +2/3, space +2/2, trade_deals +1/2, cohesion -1/1') },
+  { id: 'hu', name: 'Maďarsko',    group: 'EU', iso: '348', baseline: 40, flagStyle: 'h3', flag: ['RED', 'WHITE', 'GREEN'],
+    interests: I('federalization -2/3, migration -2/3, cohesion +2/2, green_deal -1/1') },
+  { id: 'mt', name: 'Malta',       group: 'EU', iso: '470', baseline: 50, flagStyle: 'malta', flag: ['WHITE', 'RED'],
+    interests: I('migration -1/3, fisheries -2/2, cohesion +1/1, transport -2/1') },
+  { id: 'de', name: 'Německo',     group: 'EU', iso: '276', baseline: 50, flagStyle: 'h3', flag: ['BLACK', 'RED', 'GOLD'],
+    interests: I('trade_deals +2/3, alt_propulsion -1/3, china_india_usa -1/2, cohesion -1/2, energy_mix +2/2') },
+  { id: 'nl', name: 'Nizozemsko',  group: 'EU', iso: '528', baseline: 50, flagStyle: 'h3', flag: ['RED', 'WHITE', 'BLUE'],
+    interests: I('cohesion -2/3, trade_deals +2/2, migration -1/2') },
+  { id: 'pl', name: 'Polsko',      group: 'EU', iso: '616', baseline: 50, flagStyle: 'h2', flag: ['WHITE', 'RED'],
+    interests: I('security +2/3, migration -2/3, fossil_exit -2/3, agriculture +2/2, trade_deals -2/2, cohesion +2/2') },
+  { id: 'pt', name: 'Portugalsko', group: 'EU', iso: '620', baseline: 50, flagStyle: 'portugal', flag: ['GREEN', 'RED', 'GOLD'],
+    interests: I('cohesion +2/3, drugs +2/2, energy_mix +2/2, fisheries -1/2, migration +1/1') },
+  { id: 'at', name: 'Rakousko',    group: 'EU', iso: '040', baseline: 50, flagStyle: 'h3', flag: ['RED', 'WHITE', 'RED'],
+    interests: I('energy_mix +2/3, security -1/2, migration -2/2, transport +2/1') },
+  { id: 'ro', name: 'Rumunsko',    group: 'EU', iso: '642', baseline: 50, flagStyle: 'v3', flag: ['BLUE', 'GOLD', 'RED'],
+    interests: I('cohesion +2/3, security +2/2, agriculture +2/2, fossil_exit -1/1') },
+  { id: 'gr', name: 'Řecko',       group: 'EU', iso: '300', baseline: 50, flagStyle: 'greece', flag: ['BLUE', 'WHITE'],
+    interests: I('migration -1/3, cohesion +2/2, security +1/2, fisheries -1/1') },
+  { id: 'sk', name: 'Slovensko',   group: 'EU', iso: '703', baseline: 50, flagStyle: 'slovakia', flag: ['WHITE', 'BLUE', 'RED'],
+    interests: I('alt_propulsion -2/3, migration -2/2, federalization -1/2') },
+  { id: 'si', name: 'Slovinsko',   group: 'EU', iso: '705', baseline: 50, flagStyle: 'slovenia', flag: ['WHITE', 'BLUE', 'RED'],
+    interests: I('cohesion +1/2, energy_mix -1/2, green_deal +1/1, transport +1/1') },
+  { id: 'es', name: 'Španělsko',   group: 'EU', iso: '724', baseline: 50, flagStyle: 'spain', flag: ['RED', 'GOLD'],
+    interests: I('fisheries -2/3, cohesion +2/2, energy_mix +2/2, migration +1/1') },
+  { id: 'se', name: 'Švédsko',     group: 'EU', iso: '752', baseline: 50, flagStyle: 'nordic', flag: ['BLUE', 'GOLD'],
+    interests: I('security +2/3, green_deal +2/2, cohesion -1/2, trade_deals +2/2') },
+
+  // ---- World powers ----
+  { id: 'us', name: 'USA',                group: 'Svět', iso: '840', baseline: 50, flagStyle: 'usa', flag: ['RED', 'WHITE', 'BLUE'],
+    interests: I('security +2/3, china_india_usa -2/2, diversification +1/2, fossil_exit -1/1') },
+  { id: 'cn', name: 'Čína',               group: 'Svět', iso: '156', baseline: 45, flagStyle: 'china', flag: ['RED', 'GOLD'],
+    interests: I('china_india_usa -2/3, diversification -2/3, minerals -2/2, alt_propulsion +2/2') },
+  { id: 'ru', name: 'Rusko',              group: 'Svět', iso: '643', baseline: 20, flagStyle: 'h3', flag: ['WHITE', 'BLUE', 'RED'],
+    interests: I('security -2/3, federalization -2/3, fossil_exit -2/3') },
+  { id: 'in', name: 'Indie',              group: 'Svět', iso: '356', baseline: 50, flagStyle: 'india', flag: ['ORANGE', 'WHITE', 'GREEN'],
+    interests: I('trade_deals +2/3, demography +2/2, china_india_usa -1/2') },
+  { id: 'gb', name: 'Spojené království', group: 'Svět', iso: '826', baseline: 50, flagStyle: 'uk', flag: ['BLUE', 'WHITE', 'RED'],
+    interests: I('security +2/2, fisheries -1/2, trade_deals +1/1') },
+  { id: 'tr', name: 'Turecko',            group: 'Svět', iso: '792', baseline: 50, flagStyle: 'turkey', flag: ['RED', 'WHITE'],
+    interests: I('trade_deals +2/2, migration -1/2, security +1/1') },
+  { id: 'br', name: 'Brazílie', note: 'za Mercosur', group: 'Svět', iso: '076', baseline: 50, flagStyle: 'brazil', flag: ['GREEN', 'GOLD', 'BLUE'],
+    interests: I('trade_deals +2/3, agriculture -2/3, green_deal -1/2') },
+  { id: 'no', name: 'Norsko',             group: 'Svět', iso: '578', baseline: 50, flagStyle: 'norway', flag: ['RED', 'WHITE', 'BLUE'],
+    interests: I('security +2/2, fossil_exit -1/2, fisheries -1/2') },
+  { id: 'ua', name: 'Ukrajina',           group: 'Svět', iso: '804', baseline: 70, flagStyle: 'h2', flag: ['BLUE', 'GOLD'],
+    interests: I('security +2/3, agriculture -2/2, federalization +1/1') },
+];
+
+/* ============================== TEXTS =============================== */
+const PRIORITY_LABELS = ['Neslibuji nic', 'Okrajově', 'Nízká', 'Střední', 'Vysoká', 'Hlavní slib'];
+const STANCE_PREFIX = ['Silně: ', 'Spíše: ', '', 'Spíše: ', 'Silně: '];
+const MOOD_BANDS = [
+  { max: 20,  label: 'Nepřátelský', color: 'RED',    face: 0 },
+  { max: 40,  label: 'Naštvaný',    color: 'ORANGE', face: 1 },
+  { max: 60,  label: 'Neutrální',   color: 'YELLOW', face: 2 },
+  { max: 80,  label: 'Spokojený',   color: 'LIME',   face: 3 },
+  { max: 100, label: 'Nadšený',     color: 'GREEN',  face: 4 },
+];
+
+/* ======================== DATA HELPERS / INDEX ====================== */
+/** Parses "topic stance/weight, ..." into [{ topic, stance, weight }]. */
+function I(spec) {
+  const out = [];
+  for (const part of spec.split(',')) {
+    const m = /^([a-z_]+)\s+([+-]?[0-2])\s*\/\s*([0-9.]+)$/.exec(part.trim());
+    if (!m) { console.warn('[MOJE KAMPAŇ] Bad interest spec:', part); continue; }
+    out.push({ topic: m[1], stance: Number(m[2]), weight: Number(m[3]) });
+  }
+  return out;
+}
+const TOPIC_BY_ID = Object.fromEntries(TOPICS.map(t => [t.id, t]));
+const ACTOR_BY_ID = Object.fromEntries(ACTORS.map(a => [a.id, a]));
+const DEFAULT_PREF = Object.freeze({ stance: CONFIG.DEFAULT_STANCE, weight: CONFIG.DEFAULT_WEIGHT });
+for (const a of ACTORS) {
+  a.pref = {};
+  for (const it of a.interests) {
+    if (!TOPIC_BY_ID[it.topic]) { console.warn('[MOJE KAMPAŇ] Unknown topic in', a.id, it.topic); continue; }
+    a.pref[it.topic] = { stance: it.stance, weight: it.weight };
+  }
+}
+const prefOf = (actor, topicId) => actor.pref[topicId] || DEFAULT_PREF;
+
+/* =============================== STATE ============================== */
+function freshCampaign() {
+  const c = {};
+  for (const t of TOPICS) c[t.id] = { priority: 0, stance: 0 };
+  return c;
+}
+const state = {
+  scene: 'campaign',                 // 'campaign' | 'transition' | 'world'
+  campaign: freshCampaign(),         // { [topicId]: { priority, stance } }
+  actors: {},                        // { [actorId]: { mood, startMood, trust, likes, dislikes } }
+  credibility: CONFIG.PHASE3.START_CREDIBILITY,
+  turn: 0,
+};
+for (const a of ACTORS) {
+  state.actors[a.id] = { mood: a.baseline, startMood: a.baseline, trust: CONFIG.PHASE3.START_TRUST, likes: [], dislikes: [] };
+}
+const totalPriority = () => TOPICS.reduce((s, t) => s + state.campaign[t.id].priority, 0);
+const promiseCount = () => TOPICS.reduce((s, t) => s + (state.campaign[t.id].priority > 0 ? 1 : 0), 0);
+
+/* ============================== UTILS =============================== */
+const $ = (sel, root = document) => root.querySelector(sel);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const clampInt = (v, a, b, d = 0) => (Number.isFinite(Number(v)) ? clamp(Math.round(Number(v)), a, b) : d);
+const easeOutCubic = p => 1 - Math.pow(1 - p, 3);
+const easeInCubic = p => p * p * p;
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+function pixCanvas(w, h, cls) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  c.className = 'px' + (cls ? ' ' + cls : '');
+  return c;
+}
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+const bayer = (x, y) => (BAYER4[(y & 3) * 4 + (x & 3)] + 0.5) / 16;
+const RGB = Object.fromEntries(Object.entries(PALETTE).map(([k, hex]) => [k, [
+  parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16),
+]]));
+/** Czech plural for "slib". */
+function slibu(n) { return n === 1 ? 'slib' : (n >= 2 && n <= 4) ? 'sliby' : 'slibů'; }
+function moodBand(m) { const v = Math.round(m); return MOOD_BANDS.find(b => v <= b.max) || MOOD_BANDS[4]; }
+function stanceText(t, s) {
+  if (s === 0) return 'Kompromis';
+  return STANCE_PREFIX[s + 2] + t.poles[s < 0 ? 0 : 1];
+}
+
+/* ============================ REACTIONS ============================= */
+const Reactions = {
+  /** +1 same stance, 0 two steps apart, -1 opposite poles. */
+  align(s, pref) { return 1 - Math.abs(s - pref) / 2; },
+
+  /** Pure: how one actor reacts to a campaign. */
+  evaluate(actor, campaign) {
+    let mood = actor.baseline;
+    const contribs = [];
+    for (const t of TOPICS) {
+      const pref = prefOf(actor, t.id);
+      const c = campaign[t.id];
+      let delta = 0, ignored = false;
+      if (c.priority > 0) {
+        delta = c.priority * pref.weight * this.align(c.stance, pref.stance) * CONFIG.MOOD_SCALE;
+      } else if (pref.weight >= CONFIG.IGNORED_WEIGHT_MIN) {
+        delta = -CONFIG.IGNORED_PENALTY;
+        ignored = true;
+      }
+      if (delta !== 0) contribs.push({ topic: t.id, delta, ignored });
+      mood += delta;
+    }
+    mood = clamp(mood, 0, 100);
+    const likes = contribs.filter(c => c.delta > 0).sort((a, b) => b.delta - a.delta);
+    const dislikes = contribs.filter(c => c.delta < 0).sort((a, b) => a.delta - b.delta);
+    return { mood, likes, dislikes };
+  },
+
+  /** Applies the current campaign to all actors (starting reactions). */
+  applyCampaign() {
+    for (const a of ACTORS) {
+      const r = this.evaluate(a, state.campaign);
+      const s = state.actors[a.id];
+      s.mood = r.mood;
+      s.startMood = r.mood;
+      s.likes = r.likes;
+      s.dislikes = r.dislikes;
+    }
+  },
+};
+
+/* ============================== SOUND =============================== */
+const Sound = {
+  ctx: null, out: null, noiseBuf: null, muted: false,
+  unlock() {
+    if (this.ctx) {
+      if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+      return;
+    }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    try {
+      this.ctx = new AC();
+      this.out = this.ctx.createGain();
+      this.out.gain.value = 0.3;
+      this.out.connect(this.ctx.destination);
+    } catch (e) { this.ctx = null; }
+  },
+  tone(freq, delay = 0, dur = 0.07, type = 'square', vol = 0.3, slideTo = 0) {
+    if (!this.ctx || this.muted) return;
+    const c = this.ctx, t0 = c.currentTime + delay;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.out);
+    o.start(t0); o.stop(t0 + dur + 0.03);
+  },
+  noise(dur, f0, f1, vol) {
+    if (!this.ctx || this.muted) return;
+    const c = this.ctx, t0 = c.currentTime;
+    if (!this.noiseBuf) {
+      this.noiseBuf = c.createBuffer(1, c.sampleRate, c.sampleRate);
+      const d = this.noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const src = c.createBufferSource(); src.buffer = this.noiseBuf; src.loop = true;
+    const f = c.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 0.9;
+    f.frequency.setValueAtTime(f0, t0);
+    f.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.35);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(this.out);
+    src.start(t0); src.stop(t0 + dur + 0.05);
+  },
+  play(name, v = 0) {
+    switch (name) {
+      case 'prio':    return this.tone(180 + v * 60, 0, 0.06, 'square', 0.22);
+      case 'prio0':   return this.tone(150, 0, 0.09, 'square', 0.18, 90);
+      case 'stance':  return this.tone(520 + v * 70, 0, 0.045, 'square', 0.16);
+      case 'toggle':  return this.tone(300, 0, 0.06, 'triangle', 0.3, 460);
+      case 'tick':    return this.tone(1250, 0, 0.02, 'square', 0.05);
+      case 'warn':
+        this.tone(130, 0, 0.1, 'square', 0.22);
+        return this.tone(98, 0.11, 0.16, 'square', 0.22);
+      case 'reset':   return this.tone(440, 0, 0.18, 'square', 0.2, 110);
+      case 'play':
+        [392, 523, 659, 784].forEach((f, i) => this.tone(f, i * 0.07, 0.1, 'square', 0.24));
+        return;
+      case 'whooshIn':  return this.noise(1.0, 260, 1500, 0.5);
+      case 'whooshOut': return this.noise(1.1, 1500, 300, 0.35);
+      case 'panel':
+        this.tone(523, 0, 0.12, 'triangle', 0.35);
+        return this.tone(784, 0.1, 0.2, 'triangle', 0.3);
+      case 'back':
+        this.tone(523, 0, 0.07, 'square', 0.22);
+        return this.tone(392, 0.07, 0.11, 'square', 0.22);
+    }
+  },
+  setMuted(m) {
+    this.muted = m;
+    UI.updateMute();
+    Save.queue();
+  },
+};
+
+/* =============================== SAVE =============================== */
+const Save = {
+  timer: 0,
+  load() {
+    try {
+      const raw = window.localStorage.getItem(CONFIG.SAVE_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      if (d && d.campaign) {
+        for (const t of TOPICS) {
+          const c = d.campaign[t.id];
+          if (!c) continue;
+          state.campaign[t.id].priority = clampInt(c.priority, 0, CONFIG.MAX_PRIORITY);
+          state.campaign[t.id].stance = clampInt(c.stance, -2, 2);
+        }
+      }
+      if (d && typeof d.muted === 'boolean') Sound.muted = d.muted;
+    } catch (e) { /* storage unavailable – keep playing in memory */ }
+  },
+  save() {
+    try {
+      window.localStorage.setItem(CONFIG.SAVE_KEY, JSON.stringify({ v: 1, campaign: state.campaign, muted: Sound.muted }));
+    } catch (e) { /* ignore */ }
+  },
+  queue() {
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.save(), 250);
+  },
+};
+
+/* ======================= PIXEL VIEW (scaling) ======================= */
+const View = {
+  dpr: 1, dev: 2, css: 2, w: 320, h: 180,
+  compute() {
+    const vw = document.documentElement.clientWidth || window.innerWidth;
+    const vh = window.innerHeight || document.documentElement.clientHeight;
+    const dpr = window.devicePixelRatio || 1;
+    const target = Math.max(CONFIG.MIN_PIXEL_CSS, Math.min(vw / CONFIG.TARGET_W, vh / CONFIG.TARGET_H));
+    const dev = Math.max(1, Math.round(target * dpr));   // whole device pixels per game pixel
+    this.dpr = dpr; this.dev = dev; this.css = dev / dpr;
+    this.w = Math.ceil(vw * dpr / dev);
+    this.h = Math.ceil(vh * dpr / dev);
+    document.documentElement.style.setProperty('--u', this.css + 'px');
+  },
+  sizeCanvas(cv, w, h) {
+    if (cv.width !== w) cv.width = w;
+    if (cv.height !== h) cv.height = h;
+    cv.style.width = (w * this.css) + 'px';
+    cv.style.height = (h * this.css) + 'px';
+  },
+};
+
+/* ====================== SPRITES (drawn in code) ===================== */
+function paintGrid(ctx, grid, ox = 0, oy = 0) {
+  for (let y = 0; y < grid.length; y++) {
+    for (let x = 0; x < grid[y].length; x++) {
+      const k = grid[y][x];
+      if (!k) continue;
+      ctx.fillStyle = PALETTE[k];
+      ctx.fillRect(ox + x, oy + y, 1, 1);
+    }
+  }
+}
+/** Paints rows of characters using a char -> palette-key map. */
+function paintRows(ctx, rows, map, ox = 0, oy = 0) {
+  rows.forEach((r, y) => {
+    for (let x = 0; x < r.length; x++) {
+      const k = map[r[x]];
+      if (k) { ctx.fillStyle = PALETTE[k]; ctx.fillRect(ox + x, oy + y, 1, 1); }
+    }
+  });
+}
+
+/* ---- Bitmap title font (2-px strokes, room for Czech accents) ---- */
+const BIG_FONT = {
+  capH: 10, accentH: 3, spacing: 1, spaceW: 4,
+  accents: {
+    acute: ['....##..', '...##...'],
+    caron: ['.##..##.', '..####..'],
+  },
+  glyphs: {
+    A: ['..####..', '.######.', '###..###', '##....##', '##....##', '########', '########', '##....##', '##....##', '##....##'],
+    E: ['########', '########', '##......', '##......', '######..', '######..', '##......', '##......', '########', '########'],
+    H: ['##....##', '##....##', '##....##', '##....##', '########', '########', '##....##', '##....##', '##....##', '##....##'],
+    J: ['..######', '..######', '......##', '......##', '......##', '......##', '......##', '##....##', '########', '.######.'],
+    K: ['##....##', '##...##.', '##..##..', '##.##...', '####....', '####....', '##.##...', '##..##..', '##...##.', '##....##'],
+    M: ['##....##', '###..###', '########', '##.##.##', '##....##', '##....##', '##....##', '##....##', '##....##', '##....##'],
+    N: ['##....##', '##....##', '###...##', '####..##', '##.##.##', '##..####', '##...###', '##....##', '##....##', '##....##'],
+    O: ['.######.', '########', '##....##', '##....##', '##....##', '##....##', '##....##', '##....##', '########', '.######.'],
+    P: ['#######.', '########', '##....##', '##....##', '########', '#######.', '##......', '##......', '##......', '##......'],
+    R: ['#######.', '########', '##....##', '##....##', '########', '#######.', '##..##..', '##...##.', '##....##', '##....##'],
+    T: ['########', '########', '...##...', '...##...', '...##...', '...##...', '...##...', '...##...', '...##...', '...##...'],
+  },
+  composed: { 'Á': ['A', 'acute'], 'Ň': ['N', 'caron'] },
+};
+function resolveGlyph(ch) {
+  const comp = BIG_FONT.composed[ch];
+  const base = BIG_FONT.glyphs[comp ? comp[0] : ch];
+  if (!base) { console.warn('[MOJE KAMPAŇ] Missing bitmap glyph:', ch); return null; }
+  return { rows: base, w: base[0].length, accent: comp ? BIG_FONT.accents[comp[1]] : null };
+}
+/**
+ * Renders text with the bitmap font to an offscreen canvas.
+ * style = { fill(row, x, isAccent) -> key, outline?: key, shadow?: { dx, dy, key } }
+ */
+function renderBigText(text, style) {
+  const F = BIG_FONT;
+  const chars = [...text];
+  const glyphs = chars.map(ch => (ch === ' ' ? null : resolveGlyph(ch)));
+  let W = 0;
+  glyphs.forEach((g, i) => { W += (g ? g.w : F.spaceW) + (i ? F.spacing : 0); });
+  const H = F.accentH + F.capH;
+  const mask = new Uint8Array(W * H);          // 0 empty, 1 cap stroke, 2 accent
+  let x0 = 0;
+  glyphs.forEach((g, i) => {
+    if (i) x0 += F.spacing;
+    if (!g) { x0 += F.spaceW; return; }
+    g.rows.forEach((r, ry) => { for (let cx = 0; cx < r.length; cx++) if (r[cx] === '#') mask[(F.accentH + ry) * W + x0 + cx] = 1; });
+    if (g.accent) g.accent.forEach((r, ry) => { for (let cx = 0; cx < r.length; cx++) if (r[cx] === '#') mask[ry * W + x0 + cx] = 2; });
+    x0 += g.w;
+  });
+  // Drop shadow = the glyph shifted by one step, attached to it; the outline wraps both.
+  const o = style.outline ? 1 : 0;
+  const sh = style.shadow || { dx: 0, dy: 0 };
+  const OW = W + 2 * o + sh.dx, OH = H + 2 * o + sh.dy;
+  const isM = (x, y) => x >= 0 && y >= 0 && x < W && y < H && mask[y * W + x] > 0;
+  const isSh = (x, y) => !!style.shadow && isM(x - sh.dx, y - sh.dy);
+  const isS = (x, y) => isM(x, y) || isSh(x, y);
+  const nearS = (x, y) => {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (isS(x + dx, y + dy)) return true;
+    return false;
+  };
+  const cv = pixCanvas(OW, OH);
+  const ctx = cv.getContext('2d');
+  for (let y = 0; y < OH; y++) for (let x = 0; x < OW; x++) {
+    const mx = x - o, my = y - o;
+    let k = null;
+    if (isM(mx, my)) k = style.fill(my - F.accentH, mx, mask[my * W + mx] === 2);
+    else if (isSh(mx, my)) k = style.shadow.key;
+    else if (o && nearS(mx, my)) k = style.outline;
+    if (k) { ctx.fillStyle = PALETTE[k]; ctx.fillRect(x, y, 1, 1); }
+  }
+  return cv;
+}
+const TITLE_STYLE = {
+  fill(row, x, accent) {
+    if (accent) return 'GOLD';
+    if (row <= 1) return 'GOLD_L';
+    if (row === 2) return (x & 1) ? 'GOLD_L' : 'GOLD';
+    if (row === 8) return (x & 1) ? 'GOLD' : 'GOLD_D';
+    if (row === 9) return 'GOLD_D';
+    return 'GOLD';
+  },
+  outline: 'NIGHT_0',
+  shadow: { dx: 1, dy: 1, key: 'BROWN' },
+};
+const BUTTON_STYLE = {
+  fill: () => 'NIGHT_1',
+  shadow: { dx: 0, dy: 1, key: 'GOLD_L' },
+};
+
+/* ---- 16x16 category icons: fill only, dark outline added automatically ---- */
+function grid(w, h) { return Array.from({ length: h }, () => Array(w).fill(null)); }
+function stamp(g, ox, oy, rows, map) {
+  rows.forEach((r, y) => {
+    for (let x = 0; x < r.length; x++) {
+      const k = typeof map === 'string' ? (r[x] === '#' ? map : null) : map[r[x]];
+      if (k) g[oy + y][ox + x] = k;
+    }
+  });
+}
+function rect(g, x, y, w, h, k) { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) g[j][i] = k; }
+function outlineGrid(g, key) {
+  const H = g.length, W = g[0].length;
+  const src = g.map(r => r.slice());
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (src[y][x]) continue;
+    const n = (yy, xx) => yy >= 0 && xx >= 0 && yy < H && xx < W && src[yy][xx];
+    if (n(y - 1, x) || n(y + 1, x) || n(y, x - 1) || n(y, x + 1)) g[y][x] = key;
+  }
+}
+/** Pixels of colour `key` touching empty space get light (left/top) or dark (right/bottom) shades. */
+function shadeEdges(g, key, light, dark) {
+  const src = g.map(r => r.slice());
+  const e = (y, x) => y < 0 || x < 0 || y >= src.length || x >= src[0].length || !src[y][x];
+  for (let y = 0; y < src.length; y++) for (let x = 0; x < src[0].length; x++) {
+    if (src[y][x] !== key) continue;
+    if (light && (e(y, x - 1) || e(y - 1, x))) g[y][x] = light;
+    else if (dark && (e(y, x + 1) || e(y + 1, x))) g[y][x] = dark;
+  }
+}
+const ICON_PAINTERS = {
+  coin(g) {
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const px = x + 0.5, py = y + 0.5;
+      if (Math.hypot(px - 8, py - 8) > 6.3) continue;
+      g[y][x] = Math.hypot(px - 9.2, py - 9.2) > 6.3 ? 'GOLD_L' : Math.hypot(px - 6.8, py - 6.8) > 6.3 ? 'GOLD_D' : 'GOLD';
+    }
+    stamp(g, 6, 5, ['..###', '.#...', '####.', '.#...', '####.', '.#...', '..###'], 'GOLD_D');
+  },
+  bolt(g) {
+    stamp(g, 0, 1, [
+      '..........###...',
+      '.........###....',
+      '........###.....',
+      '.......###......',
+      '......###.......',
+      '.....########...',
+      '....########....',
+      '........###.....',
+      '.......###......',
+      '......###.......',
+      '.....###........',
+      '....##..........',
+      '...#............',
+    ], 'GOLD');
+    shadeEdges(g, 'GOLD', 'GOLD_L', 'GOLD_D');
+  },
+  apple(g) {
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const px = x + 0.5, py = y + 0.5;
+      if (Math.hypot(px - 8, py - 9.5) > 5.6) continue;
+      g[y][x] = Math.hypot(px - 6.9, py - 8.4) > 5.6 ? 'MAROON' : 'RED';
+    }
+    g[4][7] = null; g[4][8] = null;
+    g[6][5] = 'WHITE'; g[7][5] = 'WHITE'; g[6][6] = 'WHITE';
+    g[2][8] = 'GOLD_D'; g[3][8] = 'GOLD_D';
+    g[2][9] = 'GREEN'; g[2][10] = 'GREEN'; g[1][10] = 'LIME'; g[1][11] = 'LIME';
+  },
+  shield(g) {
+    const spans = { 1: [2, 13], 2: [2, 13], 3: [2, 13], 4: [2, 13], 5: [2, 13], 6: [2, 13], 7: [2, 13], 8: [2, 13],
+      9: [3, 12], 10: [3, 12], 11: [4, 11], 12: [5, 10], 13: [6, 9], 14: [7, 8] };
+    for (const [yy, [a, b]] of Object.entries(spans)) {
+      const y = Number(yy);
+      for (let x = a; x <= b; x++) g[y][x] = (x === a || y === 1) ? 'SKY' : (x === b ? 'NIGHT_3' : 'BLUE');
+    }
+    rect(g, 7, 3, 2, 8, 'GOLD');
+    rect(g, 4, 5, 8, 2, 'GOLD');
+    g[3][7] = 'GOLD_L'; g[5][4] = 'GOLD_L';
+  },
+  heart(g) {
+    stamp(g, 0, 3, [
+      '...####..####...',
+      '..############..',
+      '..############..',
+      '..############..',
+      '..############..',
+      '...##########...',
+      '....########....',
+      '.....######.....',
+      '......####......',
+      '.......##.......',
+    ], 'RED');
+    shadeEdges(g, 'RED', null, 'MAROON');
+    g[4][4] = 'WHITE';
+    rect(g, 7, 5, 2, 6, 'WHITE');
+    rect(g, 5, 7, 6, 2, 'WHITE');
+  },
+  train(g) {
+    rect(g, 4, 1, 8, 1, 'BLUE');
+    rect(g, 3, 2, 10, 9, 'BLUE');
+    rect(g, 4, 3, 8, 4, 'SKY');
+    g[3][4] = 'WHITE'; g[3][5] = 'WHITE'; g[4][4] = 'WHITE';
+    rect(g, 3, 8, 10, 1, 'GOLD');
+    g[9][4] = 'GOLD_L'; g[9][5] = 'GOLD_L'; g[9][10] = 'GOLD_L'; g[9][11] = 'GOLD_L';
+    rect(g, 3, 11, 10, 1, 'NIGHT_3');
+    rect(g, 4, 12, 2, 1, 'CLOUD_S');
+    rect(g, 10, 12, 2, 1, 'CLOUD_S');
+    rect(g, 1, 14, 14, 1, 'CLOUD_M');
+  },
+  rocket(g) {
+    stamp(g, 0, 1, [
+      '.......rr.......',
+      '......rrrr......',
+      '......wwww......',
+      '.....wwsswc.....',
+      '.....wwsswc.....',
+      '.....wwwwwc.....',
+      '.....wwwwwc.....',
+      '.....wwwwwc.....',
+      '....rwwwwwcr....',
+      '...rrwwwwwcrr...',
+      '...rr.mmmm.rr...',
+      '......oooo......',
+      '.......yy.......',
+    ], { r: 'RED', w: 'WHITE', s: 'SKY', c: 'CLOUD_M', m: 'CLOUD_S', o: 'ORANGE', y: 'GOLD' });
+  },
+};
+
+/* ---- 8x8 mood faces (index = MOOD_BANDS[i].face) ---- */
+const FACE_ROWS = [
+  ['..####..', '.k####k.', '##k##k##', '########', '##kkkk##', '#k####k#', '.######.', '..####..'], // Nepřátelský
+  ['..####..', '.######.', '##k##k##', '########', '##kkkk##', '#k####k#', '.######.', '..####..'], // Naštvaný
+  ['..####..', '.######.', '##k##k##', '########', '########', '##kkkk##', '.######.', '..####..'], // Neutrální
+  ['..####..', '.######.', '##k##k##', '########', '#k####k#', '##kkkk##', '.######.', '..####..'], // Spokojený
+  ['..####..', '.######.', '##k##k##', '########', '#kkkkkk#', '##kkkk##', '.######.', '..####..'], // Nadšený
+];
+
+/* ---- 15x9 flags ---- */
+const FLAG_W = 15, FLAG_H = 9;
+function drawFlag(ctx, actor) {
+  const C = actor.flag.map(k => PALETTE[k]);
+  const P = PALETTE;
+  const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); };
+  const dot = (x, y, col) => R(x, y, 1, 1, col);
+  switch (actor.flagStyle) {
+    case 'h2': R(0, 0, 15, 5, C[0]); R(0, 5, 15, 4, C[1]); break;
+    case 'h3': R(0, 0, 15, 3, C[0]); R(0, 3, 15, 3, C[1]); R(0, 6, 15, 3, C[2]); break;
+    case 'v3': R(0, 0, 5, 9, C[0]); R(5, 0, 5, 9, C[1]); R(10, 0, 5, 9, C[2]); break;
+    case 'nordic': R(0, 0, 15, 9, C[0]); R(4, 0, 3, 9, C[1]); R(0, 3, 15, 3, C[1]); break;
+    case 'norway':
+      R(0, 0, 15, 9, C[0]); R(3, 0, 5, 9, C[1]); R(0, 2, 15, 5, C[1]); R(4, 0, 3, 9, C[2]); R(0, 3, 15, 3, C[2]); break;
+    case 'cz': {
+      R(0, 0, 15, 5, C[0]); R(0, 5, 15, 4, C[1]);
+      const tw = [1, 3, 4, 6, 8, 6, 4, 3, 1];
+      tw.forEach((w, y) => R(0, y, w, 1, C[2]));
+      break;
+    }
+    case 'spain': R(0, 0, 15, 9, C[0]); R(0, 2, 15, 5, C[1]); dot(4, 4, P.RED); break;
+    case 'greece':
+      for (let y = 0; y < 9; y++) R(0, y, 15, 1, y % 2 ? C[1] : C[0]);
+      R(0, 0, 5, 5, C[0]); R(2, 0, 1, 5, C[1]); R(0, 2, 5, 1, C[1]); break;
+    case 'portugal': R(0, 0, 6, 9, C[0]); R(6, 0, 9, 9, C[1]); R(5, 3, 2, 3, C[2]); break;
+    case 'malta': R(0, 0, 8, 9, C[0]); R(8, 0, 7, 9, C[1]); R(1, 1, 2, 2, P.CLOUD_M); break;
+    case 'cyprus':
+      R(0, 0, 15, 9, C[0]); R(5, 2, 6, 1, C[1]); R(3, 3, 8, 1, C[1]); R(4, 4, 4, 1, C[1]);
+      R(5, 6, 2, 1, C[2]); R(8, 6, 2, 1, C[2]); break;
+    case 'croatia':
+      R(0, 0, 15, 3, C[0]); R(0, 3, 15, 3, C[1]); R(0, 6, 15, 3, C[2]);
+      for (let y = 2; y < 7; y++) for (let x = 6; x < 9; x++) dot(x, y, (x + y) % 2 ? P.WHITE : P.RED);
+      break;
+    case 'slovakia':
+      R(0, 0, 15, 3, C[0]); R(0, 3, 15, 3, C[1]); R(0, 6, 15, 3, C[2]);
+      R(3, 2, 3, 4, P.RED); dot(4, 6, P.RED); R(4, 2, 1, 4, P.WHITE); R(3, 3, 3, 1, P.WHITE); R(3, 5, 3, 1, P.BLUE);
+      break;
+    case 'slovenia':
+      R(0, 0, 15, 3, C[0]); R(0, 3, 15, 3, C[1]); R(0, 6, 15, 3, C[2]);
+      R(3, 1, 3, 3, P.BLUE); dot(4, 2, P.WHITE); R(3, 1, 3, 1, P.RED);
+      break;
+    case 'india':
+      R(0, 0, 15, 3, C[0]); R(0, 3, 15, 3, C[1]); R(0, 6, 15, 3, C[2]); dot(7, 4, P.BLUE); break;
+    case 'usa':
+      for (let y = 0; y < 9; y++) R(0, y, 15, 1, y % 2 ? C[1] : C[0]);
+      R(0, 0, 7, 5, C[2]);
+      [[1, 1], [3, 1], [5, 1], [2, 3], [4, 3]].forEach(([x, y]) => dot(x, y, P.WHITE));
+      break;
+    case 'uk':
+      R(0, 0, 15, 9, C[0]);
+      for (let x = 0; x < 15; x++) for (let y = 0; y < 9; y++) {
+        const a = Math.abs((y + 0.5) * 15 / 9 - (x + 0.5));
+        const b = Math.abs((8.5 - y) * 15 / 9 - (x + 0.5));
+        if (a < 1.3 || b < 1.3) dot(x, y, C[1]);
+        if (a < 0.45 || b < 0.45) dot(x, y, C[2]);
+      }
+      R(6, 0, 3, 9, C[1]); R(0, 3, 15, 3, C[1]); R(7, 0, 1, 9, C[2]); R(0, 4, 15, 1, C[2]);
+      break;
+    case 'china':
+      R(0, 0, 15, 9, C[0]); R(3, 1, 1, 3, C[1]); R(2, 2, 3, 1, C[1]);
+      [[6, 1], [7, 2], [7, 4], [6, 5]].forEach(([x, y]) => dot(x, y, C[1]));
+      break;
+    case 'turkey':
+      R(0, 0, 15, 9, C[0]);
+      for (let x = 0; x < 15; x++) for (let y = 0; y < 9; y++) {
+        const inO = Math.hypot(x + 0.5 - 5.2, y + 0.5 - 4.5) <= 3.1;
+        const inI = Math.hypot(x + 0.5 - 6.3, y + 0.5 - 4.5) <= 2.5;
+        if (inO && !inI) dot(x, y, C[1]);
+      }
+      R(9, 4, 3, 1, C[1]); R(10, 3, 1, 3, C[1]);
+      break;
+    case 'brazil': {
+      R(0, 0, 15, 9, C[0]);
+      const hw = [0, 2, 3, 5, 6, 5, 3, 2, 0];
+      hw.forEach((w, y) => { if (w) R(7 - w, y, 2 * w + 1, 1, C[1]); });
+      for (let x = 0; x < 15; x++) for (let y = 0; y < 9; y++) {
+        if (Math.hypot(x + 0.5 - 7.5, y + 0.5 - 4.5) <= 2.2) dot(x, y, C[2]);
+      }
+      break;
+    }
+    default: R(0, 0, 15, 9, C[0] || P.INK);
+  }
+}
+
+const Sprites = {
+  faces: [], icons: {}, ringStar: null, ringStarBright: null,
+  muteOn: null, muteOff: null, titles: null, playLabel: null,
+  toURL(w, h, paint) { const c = pixCanvas(w, h); paint(c.getContext('2d')); return c.toDataURL(); },
+  build() {
+    // Mood faces
+    this.faces = FACE_ROWS.map((rows, i) => {
+      const c = pixCanvas(8, 8);
+      paintRows(c.getContext('2d'), rows, { '#': MOOD_BANDS[i].color, k: 'NIGHT_0' });
+      return c;
+    });
+    // Category icons
+    for (const name of Object.keys(ICON_PAINTERS)) {
+      const g = grid(16, 16);
+      ICON_PAINTERS[name](g);
+      outlineGrid(g, 'NIGHT_0');
+      const c = pixCanvas(16, 16);
+      paintGrid(c.getContext('2d'), g);
+      this.icons[name] = c;
+    }
+    // Ring star (5x5)
+    const star = ['..#..', '.#c#.', '#####', '.###.', '.#.#.'];
+    this.ringStar = pixCanvas(5, 5);
+    paintRows(this.ringStar.getContext('2d'), star, { '#': 'GOLD', c: 'GOLD_L' });
+    this.ringStarBright = pixCanvas(5, 5);
+    paintRows(this.ringStarBright.getContext('2d'), star, { '#': 'GOLD_L', c: 'WHITE' });
+    // Titles
+    this.titles = {
+      one: renderBigText('MOJE KAMPAŇ', TITLE_STYLE),
+      a: renderBigText('MOJE', TITLE_STYLE),
+      b: renderBigText('KAMPAŇ', TITLE_STYLE),
+    };
+    this.playLabel = renderBigText('HRÁT', BUTTON_STYLE);
+    // Mute icons (9x9)
+    this.muteOn = ['....w....', '...ww..w.', '..www...w', 'wwwww.w.w', 'wwwww.w.w', 'wwwww.w.w', '..www...w', '...ww..w.', '....w....'];
+    this.muteOff = ['....w....', '...ww....', '..www....', 'wwwww.r.r', 'wwwww..r.', 'wwwww.r.r', '..www....', '...ww....', '....w....'];
+    // CSS images: X for "no promise" and the 50% dither used by docks
+    const drawX = (ctx, key) => {
+      ctx.fillStyle = PALETTE[key];
+      for (let i = 0; i < 5; i++) { ctx.fillRect(4 + i, 4 + i, 1, 1); ctx.fillRect(8 - i, 4 + i, 1, 1); }
+    };
+    const root = document.documentElement.style;
+    root.setProperty('--x-dim', `url(${this.toURL(13, 13, ctx => drawX(ctx, 'CLOUD_S'))})`);
+    root.setProperty('--x-on', `url(${this.toURL(13, 13, ctx => drawX(ctx, 'WHITE'))})`);
+    root.setProperty('--dither', `url(${this.toURL(2, 2, ctx => { ctx.fillStyle = PALETTE.NIGHT_0; ctx.fillRect(0, 0, 1, 1); ctx.fillRect(1, 1, 1, 1); })})`);
+  },
+  icon(name) {
+    const c = pixCanvas(16, 16, 'icon16');
+    c.getContext('2d').drawImage(this.icons[name], 0, 0);
+    c.setAttribute('aria-hidden', 'true');
+    return c;
+  },
+};
+
+/* ======================= BACKGROUND NIGHT SKY ======================= */
+const TWINKLE = ['NIGHT_4', 'CLOUD_S', 'CLOUD_M', 'CLOUD_L', 'WHITE'];
+const Sky = {
+  stars: [], sky: null,
+  init() {
+    // Stars live in a fixed 1024x1024 virtual field so resizing never reshuffles them.
+    const rng = mulberry32(20260929);
+    const n = Math.round(1024 * 1024 / 380);
+    for (let i = 0; i < n; i++) {
+      const r = rng();
+      this.stars.push({
+        x: Math.floor(rng() * 1024), y: Math.floor(rng() * 1024),
+        k: r < 0.72 ? 0 : r < 0.96 ? 1 : 2,
+        dim: PALETTE[rng() < 0.6 ? 'NIGHT_3' : 'NIGHT_4'],
+        sp: 0.6 + rng() * 2.2, ph: rng() * 6.283,
+      });
+    }
+  },
+  build(w, h) {
+    // Night gradient as flat bands with dithered transitions (no smooth gradients).
+    const c = pixCanvas(w, h), ctx = c.getContext('2d');
+    const img = ctx.createImageData(w, h), d = img.data;
+    const keys = ['NIGHT_0', 'NIGHT_1', 'NIGHT_2'];
+    const bounds = [Math.round(h * 0.3), Math.round(h * 0.8)];
+    const D = 6;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let band = y < bounds[0] ? 0 : y < bounds[1] ? 1 : 2;
+      for (let b = 0; b < 2; b++) {
+        if (Math.abs(y - bounds[b]) < D) {
+          const f = (y - bounds[b] + D) / (2 * D);
+          band = bayer(x, y) < f ? b + 1 : b;
+        }
+      }
+      const rgb = RGB[keys[band]], i = (y * w + x) * 4;
+      d[i] = rgb[0]; d[i + 1] = rgb[1]; d[i + 2] = rgb[2]; d[i + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    this.sky = c;
+  },
+  render(ctx, t, scrollY) {
+    const W = View.w, H = View.h;
+    if (this.sky) ctx.drawImage(this.sky, 0, 0);
+    const off = Math.floor(scrollY / View.css * 0.12);
+    for (const s of this.stars) {
+      if (s.x >= W) continue;
+      const y = (((s.y - off) % 1024) + 1024) % 1024;
+      if (y >= H) continue;
+      if (s.k === 0) { ctx.fillStyle = s.dim; ctx.fillRect(s.x, y, 1, 1); continue; }
+      const lvl = Math.floor((Math.sin(t * s.sp + s.ph) * 0.5 + 0.5) * 4.999);
+      if (s.k === 1) { ctx.fillStyle = PALETTE[TWINKLE[lvl]]; ctx.fillRect(s.x, y, 1, 1); continue; }
+      ctx.fillStyle = PALETTE[TWINKLE[Math.max(0, lvl - 2)]];
+      ctx.fillRect(s.x - 1, y, 3, 1); ctx.fillRect(s.x, y - 1, 1, 3);
+      ctx.fillStyle = PALETTE[TWINKLE[Math.min(4, lvl + 1)]];
+      ctx.fillRect(s.x, y, 1, 1);
+    }
+  },
+};
+
+/* ======================= HERO: title + star ring ==================== */
+const Hero = {
+  cv: null, ctx: null, w: 0, h: 0, T: 2, lines: [], blockH: 0, R: 40, rot: 0,
+  init() { this.cv = $('#hero-canvas'); this.ctx = this.cv.getContext('2d'); },
+  layout() {
+    const w = View.w, t = Sprites.titles;
+    if (t.one.width * 3 <= w * 0.62) { this.T = 3; this.lines = [t.one]; }
+    else if (t.one.width * 2 + 16 <= w) { this.T = 2; this.lines = [t.one]; }
+    else if (Math.max(t.a.width, t.b.width) * 2 + 12 <= w) { this.T = 2; this.lines = [t.a, t.b]; }
+    else if (t.one.width + 8 <= w) { this.T = 1; this.lines = [t.one]; }
+    else { this.T = 1; this.lines = [t.a, t.b]; }
+    this.blockH = this.lines.reduce((s, l) => s + l.height * this.T, 0);
+    this.R = Math.round(clamp(this.blockH * 0.8 + 14, 28, 50));
+    this.w = w;
+    this.h = Math.max(this.R * 2 + 16, this.blockH + 16);
+    View.sizeCanvas(this.cv, w, this.h);
+  },
+  update(dt) { this.rot += dt * 0.16; },
+  render(t) {
+    const c = this.ctx;
+    c.imageSmoothingEnabled = false;
+    c.clearRect(0, 0, this.w, this.h);
+    const cx = Math.floor(this.w / 2), cy = Math.floor(this.h / 2);
+    // Rotating ring of 12 gold stars, behind the title
+    for (let i = 0; i < 12; i++) {
+      const a = this.rot + i * Math.PI / 6;
+      const x = Math.round(cx + Math.cos(a) * this.R) - 2;
+      const y = Math.round(cy + Math.sin(a) * this.R) - 2;
+      const bright = ((Math.floor(t * 3) + i * 5) % 17) === 0;
+      c.drawImage(bright ? Sprites.ringStarBright : Sprites.ringStar, x, y);
+    }
+    // Title, bobbing by one pixel in steps
+    const bob = (Math.floor(t / 0.55) % 2) ? -1 : 0;
+    let y = Math.round(cy - this.blockH / 2) + bob;
+    for (const ln of this.lines) {
+      const lw = ln.width * this.T, lh = ln.height * this.T;
+      c.drawImage(ln, Math.round(cx - lw / 2), y, lw, lh);
+      y += lh;
+    }
+  },
+};
+
+/* ========================= CLOUD TRANSITION ========================= */
+const CLOUD_SHADES = {
+  front: ['WHITE', 'CLOUD_L', 'CLOUD_S'],     // white, light grey, shadow grey
+  back:  ['CLOUD_L', 'CLOUD_M', 'CLOUD_S'],   // deeper layer, one step darker
+};
+const DISSOLVE_LEVELS = 8;
+
+/** Procedural cloud: overlapping ellipses, 3 dithered shades, cached per dissolve level. */
+function makeCloudSprite(w, h, shadeKeys, rng) {
+  const core = { cx: w / 2, cy: h * 0.6, rx: w * 0.42, ry: h * 0.29 };
+  const blobs = [core,
+    { cx: w * 0.2, cy: h * 0.66, rx: w * 0.16, ry: h * 0.2 },
+    { cx: w * 0.8, cy: h * 0.66, rx: w * 0.16, ry: h * 0.2 }];
+  const puffs = 4 + Math.floor(rng() * 3);
+  for (let i = 0; i < puffs; i++) {
+    const rx = w * (0.13 + rng() * 0.11);
+    const ry = rx * (0.8 + rng() * 0.25);
+    const cx = rx + 1 + rng() * (w - 2 * rx - 2);
+    const cyMax = Math.min(h * 0.55, h - ry - 1);
+    const cy = ry + 1 + rng() * Math.max(0, cyMax - ry - 1);
+    blobs.push({ cx, cy, rx, ry });
+  }
+  const idx = new Int8Array(w * h).fill(-1);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const px = x + 0.5, py = y + 0.5;
+    let inside = false, light = -9;
+    for (const b of blobs) {
+      const nx = (px - b.cx) / b.rx, ny = (py - b.cy) / b.ry;
+      if (nx * nx + ny * ny <= 1) inside = true;
+      const lx = (px - (b.cx - 0.3 * b.rx)) / b.rx, ly = (py - (b.cy - 0.55 * b.ry)) / b.ry;
+      const l = 1 - Math.sqrt(lx * lx + ly * ly);
+      if (l > light) light = l;
+    }
+    if (!inside) continue;
+    const t = light + (bayer(x, y) - 0.5) * 0.22;
+    idx[y * w + x] = t > 0.42 ? 0 : t > 0.02 ? 1 : 2;
+  }
+  // Shadow rim along the underside
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x;
+    if (idx[i] >= 0 && (y + 1 >= h || idx[i + w] < 0)) idx[i] = 2;
+  }
+  const levels = [];
+  for (let k = 1; k <= DISSOLVE_LEVELS; k++) {
+    const c = pixCanvas(w, h), ctx = c.getContext('2d');
+    const img = ctx.createImageData(w, h), d = img.data;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const s = idx[y * w + x];
+      if (s < 0 || bayer(x, y) >= k / DISSOLVE_LEVELS) continue;
+      const rgb = RGB[shadeKeys[s]], i = (y * w + x) * 4;
+      d[i] = rgb[0]; d[i + 1] = rgb[1]; d[i + 2] = rgb[2]; d[i + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    levels.push(c);
+  }
+  // Largest rectangle guaranteed solid (inscribed in the core ellipse) – used for full coverage.
+  const hx = core.rx / Math.SQRT2, hy = core.ry / Math.SQRT2;
+  const coreRect = {
+    x0: Math.ceil(core.cx - hx - 0.5), x1: Math.floor(core.cx + hx - 0.5),
+    y0: Math.ceil(core.cy - hy - 0.5), y1: Math.floor(core.cy + hy - 0.5),
+  };
+  return { w, h, levels, core: coreRect };
+}
+
+const Clouds = {
+  ready: false, sets: null,
+  build() {
+    if (this.ready) return;
+    const rng = mulberry32(777);
+    this.sets = {
+      back:  [0, 1, 2, 3].map(() => makeCloudSprite(112, 72, CLOUD_SHADES.back, rng)),
+      mid:   [0, 1, 2, 3].map(() => makeCloudSprite(112, 72, CLOUD_SHADES.front, rng)),
+      front: [0, 1, 2].map(() => makeCloudSprite(160, 100, CLOUD_SHADES.front, rng)),
+    };
+    this.ready = true;
+  },
+  /** Places clouds so that the back layer's solid cores tile the whole screen. */
+  layout(W, H, seed) {
+    const rng = mulberry32(seed);
+    const pick = arr => arr[Math.floor(rng() * arr.length)];
+    const list = [];
+    const back = this.sets.back, core = back[0].core;
+    const cw = core.x1 - core.x0 + 1, ch = core.y1 - core.y0 + 1;
+    const J = 4, stepX = cw - J, stepY = ch - J;
+    for (let row = 0; ; row++) {
+      const coreTop = row * stepY - Math.floor(rng() * J);
+      const shift = (row % 2) ? Math.floor(stepX / 2) : 0;
+      for (let col = 0; ; col++) {
+        const coreLeft = col * stepX - Math.floor(rng() * J) - shift;
+        list.push(this.make(pick(back), coreLeft - core.x0, coreTop - core.y0, 0, W, H, rng));
+        if (coreLeft + cw >= W) break;
+      }
+      if (coreTop + ch >= H) break;
+    }
+    list.sort((a, b) => a.ty - b.ty);                // lower clouds overlap upper ones
+    const midCount = Math.round(list.length * 0.3);
+    for (let i = 0; i < midCount; i++) {
+      const s = pick(this.sets.mid);
+      list.push(this.make(s, Math.round(rng() * W - s.w / 2), Math.round(rng() * H - s.h / 2), 1, W, H, rng));
+    }
+    const frontCount = Math.max(2, Math.round(W * H / (160 * 100) * 0.9));
+    for (let i = 0; i < frontCount; i++) {
+      const s = pick(this.sets.front);
+      list.push(this.make(s, Math.round(rng() * W - s.w / 2), Math.round(rng() * H - s.h / 2), 2, W, H, rng));
+    }
+    return list;
+  },
+  make(sprite, tx, ty, layer, W, H, rng) {
+    const lp = [1, 1.35, 1.75][layer];              // parallax: front layers travel further
+    const cx = tx + sprite.w / 2, cy = ty + sprite.h / 2;
+    let sx = tx, sy = ty, edgeP;
+    if (cy > H * 0.66) {                            // from the bottom
+      sy = H + rng() * 20 + Math.max(0, H - cy) * 0.3 * lp;
+      sx = tx + Math.round((rng() - 0.5) * 16);
+      edgeP = clamp((H - cy) / (H * 0.34), 0, 1);
+    } else if (cx < W / 2) {                        // from the left
+      sx = -sprite.w - rng() * 20 - Math.max(0, cx) * 0.3 * lp;
+      sy = ty + Math.round((rng() - 0.5) * 12);
+      edgeP = clamp(cx / (W / 2), 0, 1);
+    } else {                                        // from the right
+      sx = W + rng() * 20 + Math.max(0, W - cx) * 0.3 * lp;
+      sy = ty + Math.round((rng() - 0.5) * 12);
+      edgeP = clamp((W - cx) / (W / 2), 0, 1);
+    }
+    const delayIn = edgeP * 0.2 + rng() * 0.06;
+    // Drift apart: outward from the centre and upward
+    const dx = cx - W / 2, dy = cy - H / 2, len = Math.hypot(dx, dy) || 1;
+    const dist = (Math.max(W, H) * 0.9 + rng() * 40) * lp;
+    const ox = (dx / len) * dist;
+    const oy = (dy / len) * dist * 0.5 - H * (0.35 + rng() * 0.25) * lp;
+    // Centre clouds leave first, so the sky opens from the middle outward.
+    const delayOut = (1 - clamp(len / (0.5 * Math.hypot(W, H)), 0, 1)) * 0.3 + rng() * 0.05;
+    return {
+      sprite, layer, tx, ty, sx, sy, ox, oy, phase: Math.floor(rng() * 4),
+      delayIn, durIn: CONFIG.T_IN - 0.26,
+      delayOut, durOut: CONFIG.T_OUT - 0.36,
+    };
+  },
+  render(ctx, list, t, W, H) {
+    ctx.clearRect(0, 0, W, H);
+    const tIn = CONFIG.T_IN, tHold = tIn + CONFIG.T_HOLD;
+    if (t >= tIn && t < tHold) { ctx.fillStyle = PALETTE.CLOUD_M; ctx.fillRect(0, 0, W, H); }
+    for (const c of list) {
+      let x, y, level = DISSOLVE_LEVELS;
+      if (t < tIn) {
+        const e = easeOutCubic(clamp((t - c.delayIn) / c.durIn, 0, 1));
+        x = c.sx + (c.tx - c.sx) * e;
+        y = c.sy + (c.ty - c.sy) * e;
+      } else if (t < tHold) {
+        x = c.tx;
+        y = c.ty + (c.layer === 2 ? (Math.floor(t * 6 + c.phase) % 2) : 0);
+      } else {
+        const p = clamp((t - tHold - c.delayOut) / c.durOut, 0, 1);
+        const e = p * p;
+        x = c.tx + c.ox * e;
+        y = c.ty + c.oy * e;
+        const dp = clamp((p - 0.3) / 0.65, 0, 1);    // drift first, then dither away
+        level = DISSOLVE_LEVELS - Math.floor(dp * (DISSOLVE_LEVELS + 0.999));
+      }
+      if (level <= 0) continue;
+      const xi = Math.round(x), yi = Math.round(y);   // whole pixels only
+      if (xi >= W || yi >= H || xi + c.sprite.w <= 0 || yi + c.sprite.h <= 0) continue;
+      ctx.drawImage(c.sprite.levels[level - 1], xi, yi);
+    }
+  },
+};
+
+/* ============================ CAMPAIGN UI =========================== */
+const CampaignUI = {
+  cards: {}, cats: {}, segs: [], resetTimer: 0,
+  build() {
+    const root = $('#categories');
+    for (const cat of CATEGORIES) {
+      const sec = el('section', 'cat');
+      const head = el('button', 'cat-head pbox');
+      head.type = 'button';
+      head.setAttribute('aria-expanded', 'true');
+      head.setAttribute('aria-controls', 'cat-' + cat.id);
+      const sum = el('span', 'cat-sum');
+      const tog = el('span', 'cat-toggle');
+      tog.setAttribute('aria-hidden', 'true');
+      head.append(Sprites.icon(cat.icon), el('span', 'cat-name', cat.name), sum, tog);
+      const body = el('div', 'cat-body');
+      body.id = 'cat-' + cat.id;
+      for (const t of TOPICS.filter(tt => tt.cat === cat.id)) body.append(this.buildCard(t));
+      head.addEventListener('click', () => {
+        const open = head.getAttribute('aria-expanded') !== 'true';
+        head.setAttribute('aria-expanded', String(open));
+        body.hidden = !open;
+        Sound.play('toggle');
+      });
+      sec.append(head, body);
+      root.append(sec);
+      this.cats[cat.id] = { sum };
+    }
+    // Ambition meter segments (each = CONFIG.AMBITION_SEGMENT points) with a capacity mark
+    const bar = $('#amb-bar');
+    const nSeg = Math.ceil(TOPICS.length * CONFIG.MAX_PRIORITY / CONFIG.AMBITION_SEGMENT);
+    const capSeg = Math.floor(CONFIG.REALISTIC_CAPACITY / CONFIG.AMBITION_SEGMENT);
+    for (let i = 0; i < nSeg; i++) {
+      if (i === capSeg) { const m = el('span', 'amb-mark'); m.title = 'Realistická kapacita'; bar.append(m); }
+      const s = el('span', 'amb-seg');
+      bar.append(s);
+      this.segs.push(s);
+    }
+    $('#amb-cap').textContent = CONFIG.REALISTIC_CAPACITY;
+    $('#btn-reset').addEventListener('click', () => this.onReset());
+  },
+  buildCard(t) {
+    const card = el('article', 'card pbox');
+    card.dataset.topic = t.id;
+    const title = el('h3', 'card-title', t.name);
+
+    // Priority: 6 pixel blocks (0 = no promise)
+    const r1 = el('div', 'crow');
+    const pbl = el('div', 'pblocks');
+    pbl.setAttribute('role', 'radiogroup');
+    pbl.setAttribute('aria-label', 'Priorita – ' + t.name);
+    const btns = [];
+    for (let i = 0; i <= CONFIG.MAX_PRIORITY; i++) {
+      const b = el('button', 'pb' + (i === 0 ? ' pb0' : ''));
+      b.type = 'button';
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-label', i + ' – ' + PRIORITY_LABELS[i]);
+      b.addEventListener('click', () => setPriority(t.id, i));
+      btns.push(b);
+      pbl.append(b);
+    }
+    pbl.addEventListener('keydown', e => {
+      const p = state.campaign[t.id].priority;
+      let n = null;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') n = Math.min(CONFIG.MAX_PRIORITY, p + 1);
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') n = Math.max(0, p - 1);
+      else if (e.key === 'Home') n = 0;
+      else if (e.key === 'End') n = CONFIG.MAX_PRIORITY;
+      if (n === null) return;
+      e.preventDefault();
+      setPriority(t.id, n);
+      btns[n].focus();
+    });
+    const ptext = el('span', 'ptext');
+    r1.append(el('span', 'lbl', 'Priorita'), pbl, ptext);
+
+    // Stance: 5-notch slider with pole labels
+    const r2 = el('div', 'crow');
+    const st = el('div', 'stance');
+    const slider = el('div', 'slider');
+    slider.tabIndex = 0;
+    slider.setAttribute('role', 'slider');
+    slider.setAttribute('aria-label', 'Postoj – ' + t.name);
+    slider.setAttribute('aria-valuemin', '-2');
+    slider.setAttribute('aria-valuemax', '2');
+    slider.append(el('div', 'track'));
+    for (let i = 0; i < 5; i++) {
+      const n = el('span', 'notch' + (i === 2 ? ' mid' : ''));
+      n.style.left = (i * 25) + '%';
+      slider.append(n);
+    }
+    const knob = el('div', 'knob');
+    slider.append(knob);
+    const poles = el('div', 'poles');
+    const pl = el('button', 'l', t.poles[0]);
+    const pr = el('button', 'r', t.poles[1]);
+    pl.type = pr.type = 'button';
+    pl.tabIndex = pr.tabIndex = -1;
+    pl.addEventListener('click', () => setStance(t.id, -2));
+    pr.addEventListener('click', () => setStance(t.id, 2));
+    poles.append(pl, pr);
+    st.append(slider, poles);
+    r2.append(el('span', 'lbl lbl-stance', 'Postoj'), st);
+
+    card.append(title, r1, r2);
+    this.bindSlider(slider, t.id);
+    this.cards[t.id] = { card, btns, ptext, slider, knob, pl, pr };
+    return card;
+  },
+  bindSlider(sl, id) {
+    const valueAt = clientX => {
+      const r = sl.getBoundingClientRect();
+      return clamp(Math.round(((clientX - r.left) / r.width) * 4) - 2, -2, 2);
+    };
+    let drag = null;   // { id, x, y, touch, active }
+    sl.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, touch: e.pointerType === 'touch', active: false };
+      if (!drag.touch) {                 // mouse/pen: act immediately
+        drag.active = true;
+        sl.setPointerCapture(e.pointerId);
+        setStance(id, valueAt(e.clientX));
+      }
+    });
+    sl.addEventListener('pointermove', e => {
+      if (!drag || drag.id !== e.pointerId) return;
+      if (!drag.active) {                // touch: only a clear horizontal drag takes over
+        const dx = Math.abs(e.clientX - drag.x), dy = Math.abs(e.clientY - drag.y);
+        if (dx > 6 && dx > dy) { drag.active = true; try { sl.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } }
+        else return;
+      }
+      setStance(id, valueAt(e.clientX));
+    });
+    sl.addEventListener('pointerup', e => {
+      if (!drag || drag.id !== e.pointerId) return;
+      if (drag.touch && !drag.active) setStance(id, valueAt(e.clientX));   // a tap
+      drag = null;
+    });
+    sl.addEventListener('pointercancel', () => { drag = null; });
+    sl.addEventListener('keydown', e => {
+      const s = state.campaign[id].stance;
+      let n = null;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') n = s + 1;
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') n = s - 1;
+      else if (e.key === 'Home') n = -2;
+      else if (e.key === 'End') n = 2;
+      if (n === null) return;
+      e.preventDefault();
+      setStance(id, clamp(n, -2, 2));
+    });
+  },
+  updateCard(id) {
+    const c = state.campaign[id], u = this.cards[id], t = TOPIC_BY_ID[id];
+    u.card.classList.toggle('off', c.priority === 0);
+    u.btns.forEach((b, i) => {
+      b.classList.toggle('on', i > 0 && i <= c.priority);
+      b.classList.toggle('sel', i === c.priority);
+      b.setAttribute('aria-checked', String(i === c.priority));
+      b.tabIndex = i === c.priority ? 0 : -1;
+    });
+    u.ptext.textContent = PRIORITY_LABELS[c.priority];
+    u.knob.style.left = ((c.stance + 2) * 25) + '%';
+    u.slider.setAttribute('aria-valuenow', String(c.stance));
+    u.slider.setAttribute('aria-valuetext', stanceText(t, c.stance));
+    u.pl.classList.toggle('act', c.stance < 0);
+    u.pr.classList.toggle('act', c.stance > 0);
+  },
+  updateSummary() {
+    for (const cat of CATEGORIES) {
+      let n = 0, sum = 0;
+      for (const t of TOPICS) {
+        if (t.cat !== cat.id) continue;
+        const p = state.campaign[t.id].priority;
+        if (p > 0) { n++; sum += p; }
+      }
+      this.cats[cat.id].sum.textContent = n ? `${n} ${slibu(n)} · ${sum} b.` : 'bez slibů';
+    }
+    const total = totalPriority(), count = promiseCount(), cap = CONFIG.REALISTIC_CAPACITY;
+    const r = total / cap;
+    const key = r > 1 ? 'RED' : r > 0.8 ? 'YELLOW' : r > 0.5 ? 'LIME' : 'GREEN';
+    $('#ambition').style.setProperty('--amb', `var(--c-${key})`);
+    $('#amb-sum').textContent = total;
+    const seg = CONFIG.AMBITION_SEGMENT;
+    this.segs.forEach((s, i) => {
+      s.classList.toggle('full', total >= (i + 1) * seg);
+      s.classList.toggle('part', total > i * seg && total < (i + 1) * seg);
+    });
+    $('#amb-count').textContent = count ? `${count} ${slibu(count)} z ${TOPICS.length} témat` : 'Zatím žádný slib';
+    $('#amb-warn').hidden = total <= cap;
+  },
+  updateAll() {
+    for (const t of TOPICS) this.updateCard(t.id);
+    this.updateSummary();
+  },
+  onReset() {
+    const b = $('#btn-reset');
+    if (!b.classList.contains('confirm')) {
+      b.classList.add('confirm');
+      b.textContent = 'Opravdu vynulovat?';
+      clearTimeout(this.resetTimer);
+      this.resetTimer = setTimeout(() => { b.classList.remove('confirm'); b.textContent = 'Vynulovat'; }, 3000);
+      return;
+    }
+    clearTimeout(this.resetTimer);
+    b.classList.remove('confirm');
+    b.textContent = 'Vynulovat';
+    state.campaign = freshCampaign();
+    this.updateAll();
+    Sound.play('reset');
+    Save.queue();
+  },
+};
+
+function setPriority(id, p) {
+  if (state.scene !== 'campaign') return;
+  const c = state.campaign[id];
+  if (c.priority === p) return;
+  const before = totalPriority();
+  c.priority = p;
+  CampaignUI.updateCard(id);
+  CampaignUI.updateSummary();
+  const cap = CONFIG.REALISTIC_CAPACITY;
+  if (before <= cap && totalPriority() > cap) Sound.play('warn');
+  else Sound.play(p ? 'prio' : 'prio0', p);
+  Save.queue();
+}
+function setStance(id, s) {
+  if (state.scene !== 'campaign') return;
+  const c = state.campaign[id];
+  if (c.stance === s) return;
+  c.stance = s;
+  CampaignUI.updateCard(id);
+  Sound.play('stance', s);
+  Save.queue();
+}
+
+/* ============================== WORLD UI ============================ */
+const WorldUI = {
+  rows: {}, summary: [],
+  build() {
+    for (const a of ACTORS) {
+      const li = el('li');
+      const btn = el('button', 'row');
+      btn.type = 'button';
+      const flag = pixCanvas(FLAG_W, FLAG_H, 'flag');
+      drawFlag(flag.getContext('2d'), a);
+      const bar = el('span', 'bar');
+      const fill = el('i');
+      bar.append(fill);
+      const face = pixCanvas(8, 8, 'face8');
+      btn.append(flag, el('span', 'name', a.name), bar, face);
+      li.append(btn);
+      let lastPointer = 'mouse';
+      btn.addEventListener('pointerdown', e => { lastPointer = e.pointerType; });
+      btn.addEventListener('pointerenter', e => {
+        if (e.pointerType !== 'mouse') return;
+        Tip.show(a.id, btn);
+        Sound.play('tick');
+      });
+      btn.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse' && Tip.pinned !== a.id) Tip.hide(); });
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        if (lastPointer === 'mouse' && e.detail > 0) { Tip.show(a.id, btn); return; }
+        if (Tip.pinned === a.id) { Tip.pinned = null; Tip.hide(); }
+        else { Tip.pinned = a.id; Tip.show(a.id, btn); }
+      });
+      btn.addEventListener('focus', () => { if (btn.matches(':focus-visible')) Tip.show(a.id, btn); });
+      btn.addEventListener('blur', () => { if (Tip.pinned !== a.id) Tip.hide(); });
+      this.rows[a.id] = { li, btn, fill, face };
+    }
+    const sum = $('#summary');
+    for (let i = MOOD_BANDS.length - 1; i >= 0; i--) {
+      const s = el('span');
+      const f = pixCanvas(8, 8, 'face8');
+      f.getContext('2d').drawImage(Sprites.faces[MOOD_BANDS[i].face], 0, 0);
+      const n = el('b', null, '0');
+      s.title = MOOD_BANDS[i].label;
+      s.append(f, n);
+      sum.append(s);
+      this.summary[i] = n;
+    }
+  },
+  refresh() {
+    const counts = MOOD_BANDS.map(() => 0);
+    for (const group of ['EU', 'Svět']) {
+      const list = group === 'EU' ? $('#list-eu') : $('#list-world');
+      const sorted = ACTORS.filter(a => a.group === group).sort((a, b) =>
+        (state.actors[b.id].mood - state.actors[a.id].mood) || a.name.localeCompare(b.name, 'cs'));
+      for (const a of sorted) {
+        const r = this.rows[a.id], m = state.actors[a.id].mood, band = moodBand(m);
+        counts[MOOD_BANDS.indexOf(band)]++;
+        r.fill.style.setProperty('--n', String(Math.round(m / 4)));
+        r.fill.style.setProperty('--mood', `var(--c-${band.color})`);
+        const fx = r.face.getContext('2d');
+        fx.clearRect(0, 0, 8, 8);
+        fx.drawImage(Sprites.faces[band.face], 0, 0);
+        r.btn.setAttribute('aria-label', `${a.name}: ${band.label}, ${Math.round(m)} ze 100`);
+        list.append(r.li);
+      }
+    }
+    counts.forEach((n, i) => { this.summary[i].textContent = String(n); });
+    const total = totalPriority(), count = promiseCount();
+    $('#panel-sub').textContent = `Tvoje kampaň: ${count} ${slibu(count)} · ambice ${total} / ${CONFIG.REALISTIC_CAPACITY}`;
+  },
+};
+
+/* ============================= TOOLTIP ============================== */
+const Tip = {
+  el: null, pinned: null, current: null, anchor: null,
+  init() {
+    this.el = $('#tip');
+    document.addEventListener('click', () => { if (this.pinned) { this.pinned = null; this.hide(); } });
+    window.addEventListener('scroll', () => { if (!this.el.hidden && this.anchor) this.position(this.anchor); }, { passive: true });
+  },
+  show(actorId, anchor) {
+    const a = ACTOR_BY_ID[actorId], s = state.actors[actorId], band = moodBand(s.mood);
+    const e = this.el;
+    e.textContent = '';
+    const h = el('h4');
+    const flag = pixCanvas(FLAG_W, FLAG_H, 'flag');
+    drawFlag(flag.getContext('2d'), a);
+    h.append(flag, document.createTextNode(a.name));
+    if (a.note) h.append(el('small', null, a.note));
+    const mood = el('p', 'mood');
+    const face = pixCanvas(8, 8, 'face8');
+    face.getContext('2d').drawImage(Sprites.faces[band.face], 0, 0);
+    mood.append(face, document.createTextNode(`${band.label} · ${Math.round(s.mood)} / 100`));
+    const likes = s.likes.slice(0, 3).map(c => TOPIC_BY_ID[c.topic].short);
+    const dislikes = s.dislikes.slice(0, 3).map(c => TOPIC_BY_ID[c.topic].short + (c.ignored ? ' (přehlížíš)' : ' (chce opak)'));
+    const pLike = el('p');
+    pLike.append(el('span', 'pos', 'Líbí se: '), document.createTextNode(likes.length ? likes.join(', ') : 'nic konkrétního'));
+    const pDis = el('p');
+    pDis.append(el('span', 'neg', 'Vadí: '), document.createTextNode(dislikes.length ? dislikes.join(', ') : 'nic zásadního'));
+    const keyTopics = a.interests.slice().sort((x, y) => y.weight - x.weight).slice(0, 3).map(it => TOPIC_BY_ID[it.topic].short);
+    const pKey = el('p', 'key', 'Hlavní zájmy: ' + keyTopics.join(', '));
+    e.append(h, mood, pLike, pDis, pKey);
+    e.hidden = false;
+    if (this.anchor && this.anchor !== anchor) this.anchor.classList.remove('active');
+    this.current = actorId;
+    this.anchor = anchor;
+    anchor.classList.add('active');
+    this.position(anchor);
+  },
+  position(anchor) {
+    const e = this.el, r = anchor.getBoundingClientRect();
+    const vw = document.documentElement.clientWidth, vh = window.innerHeight;
+    const tw = e.offsetWidth, th = e.offsetHeight, u = View.css;
+    let left = r.left + Math.min(24, r.width / 4);
+    left = clamp(left, 8, vw - tw - 8);
+    let top = r.bottom + 6;
+    if (top + th > vh - 90 && r.top - th - 6 > 8) top = r.top - th - 6;
+    e.style.left = Math.round((left + window.scrollX) / u) * u + 'px';
+    e.style.top = Math.round((top + window.scrollY) / u) * u + 'px';
+  },
+  hide(force) {
+    if (force) this.pinned = null;
+    this.el.hidden = true;
+    if (this.anchor) this.anchor.classList.remove('active');
+    this.current = null;
+    this.anchor = null;
+  },
+};
+
+/* ============================ GENERAL UI ============================ */
+const UI = {
+  updateMute() {
+    const c = $('#mute-icon'), ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, 9, 9);
+    paintRows(ctx, Sound.muted ? Sprites.muteOff : Sprites.muteOn, { w: 'WHITE', r: 'RED' });
+    const b = $('#btn-mute');
+    b.setAttribute('aria-pressed', String(Sound.muted));
+    b.setAttribute('aria-label', Sound.muted ? 'Zapnout zvuk' : 'Vypnout zvuk');
+    b.title = Sound.muted ? 'Zapnout zvuk' : 'Vypnout zvuk';
+  },
+  setInert(on) {
+    document.querySelectorAll('.screen, #btn-mute').forEach(n => { n.inert = on; });
+  },
+  pressFx(btn) {
+    btn.classList.add('pressed');
+    setTimeout(() => btn.classList.remove('pressed'), 140);
+  },
+};
+
+/* ============================== SCENES ============================== */
+let bgCtx = null, fxCtx = null;
+
+const CampaignScene = {
+  t: 0, scrollY: 0,
+  enter() {
+    $('#screen-campaign').hidden = false;
+    window.scrollTo(0, this.scrollY || 0);
+  },
+  exit() {
+    this.scrollY = window.scrollY;
+    $('#screen-campaign').hidden = true;
+  },
+  afterTransition() { $('#btn-play').focus({ preventScroll: true }); },
+  update(dt) { this.t += dt; Hero.update(dt); },
+  render() {
+    Sky.render(bgCtx, this.t, window.scrollY);
+    Hero.render(this.t);
+  },
+};
+
+const WorldScene = {
+  t: 0, shown: false,
+  enter() {
+    this.t = 0;
+    this.shown = false;
+    $('#screen-world').hidden = false;
+    const panel = $('#panel');
+    panel.hidden = true;
+    panel.classList.remove('show');
+    $('#world-dock').hidden = true;
+    $('#world-dock').classList.remove('show');
+    WorldUI.refresh();
+    window.scrollTo(0, 0);
+  },
+  exit() {
+    Tip.hide(true);
+    $('#screen-world').hidden = true;
+  },
+  afterTransition() { if (this.shown) $('#panel-title').focus({ preventScroll: true }); },
+  update(dt) {
+    this.t += dt;
+    if (!this.shown && this.t >= CONFIG.PANEL_DELAY) {
+      this.shown = true;
+      $('#panel').hidden = false;
+      $('#panel').classList.add('show');
+      $('#world-dock').hidden = false;
+      $('#world-dock').classList.add('show');
+      Sound.play('panel');
+    }
+  },
+  /** Phase 2 replaces this with the pixel map of Europe. */
+  renderBackground(ctx) {
+    ctx.fillStyle = PALETTE.BLACK;
+    ctx.fillRect(0, 0, View.w, View.h);
+  },
+  render() { this.renderBackground(bgCtx); },
+};
+
+const TransitionScene = {
+  from: null, to: null, under: null, t: 0, list: [], swapped: false, outSfx: false, seed: 1,
+  enter({ from, to }) {
+    this.from = from; this.to = to; this.under = from;
+    this.t = 0; this.swapped = false; this.outSfx = false;
+    Clouds.build();
+    this.seed = (Math.random() * 1e9) | 0;
+    this.list = Clouds.layout(View.w, View.h, this.seed);
+    $('#fxwrap').classList.add('active');
+    UI.setInert(true);
+    Sound.play('whooshIn');
+  },
+  relayout() { this.list = Clouds.layout(View.w, View.h, this.seed); },
+  update(dt) {
+    this.t += dt;
+    if (!this.swapped && this.t >= CONFIG.T_IN) {        // screen fully covered: swap scenes
+      this.swapped = true;
+      this.from.exit();
+      this.to.enter();
+      this.under = this.to;
+    }
+    if (!this.outSfx && this.t >= CONFIG.T_IN + CONFIG.T_HOLD) { this.outSfx = true; Sound.play('whooshOut'); }
+    this.under.update(dt);
+    if (this.t >= CONFIG.T_IN + CONFIG.T_HOLD + CONFIG.T_OUT) this.finish();
+  },
+  render() {
+    this.under.render();
+    if (Scenes.current === this) Clouds.render(fxCtx, this.list, this.t, View.w, View.h);
+  },
+  finish() {
+    fxCtx.clearRect(0, 0, View.w, View.h);
+    $('#fxwrap').classList.remove('active');
+    UI.setInert(false);
+    Scenes.current = this.to;
+    state.scene = this.to.name;
+    if (this.to.afterTransition) this.to.afterTransition();
+  },
+};
+
+const Scenes = {
+  list: {}, current: null,
+  add(name, scene) { scene.name = name; this.list[name] = scene; },
+  start(name) {
+    this.current = this.list[name];
+    state.scene = name;
+    this.current.enter();
+  },
+  /** Every scene change goes through the cloud transition. */
+  go(name) {
+    const target = this.list[name];
+    if (!target || !this.current || this.current === target || this.current === TransitionScene) return;
+    const from = this.current;
+    this.current = TransitionScene;
+    state.scene = 'transition';
+    TransitionScene.enter({ from, to: target });
+  },
+  update(dt) { this.current.update(dt); },
+  render() { this.current.render(); },
+};
+Scenes.add('campaign', CampaignScene);
+Scenes.add('world', WorldScene);
+Scenes.add('transition', TransitionScene);
+
+/* ============================ BOOT / LOOP =========================== */
+let needsResize = true;
+function onResize() {
+  View.compute();
+  View.sizeCanvas($('#bg'), View.w, View.h);
+  View.sizeCanvas($('#fx'), View.w, View.h);
+  Sky.build(View.w, View.h);
+  Hero.layout();
+  if (Scenes.current === TransitionScene) TransitionScene.relayout();
+  if (Tip.anchor) Tip.position(Tip.anchor);
+}
+
+let lastT = 0;
+function frame(now) {
+  const dt = lastT ? Math.min(0.1, (now - lastT) / 1000) : 1 / 60;
+  lastT = now;
+  if (needsResize) { needsResize = false; onResize(); }
+  bgCtx.imageSmoothingEnabled = false;
+  fxCtx.imageSmoothingEnabled = false;
+  Scenes.update(dt);
+  Scenes.render();
+  requestAnimationFrame(frame);
+}
+
+function boot() {
+  // Export the palette as CSS variables (single source of truth).
+  const rs = document.documentElement.style;
+  for (const [k, v] of Object.entries(PALETTE)) rs.setProperty('--c-' + k, v);
+
+  bgCtx = $('#bg').getContext('2d');
+  fxCtx = $('#fx').getContext('2d');
+  Sprites.build();
+  Sky.init();
+  Hero.init();
+  Save.load();
+  CampaignUI.build();
+  WorldUI.build();
+  Tip.init();
+  CampaignUI.updateAll();
+  UI.updateMute();
+
+  // "HRÁT" label drawn with the bitmap font
+  const lbl = $('#play-label');
+  lbl.width = Sprites.playLabel.width;
+  lbl.height = Sprites.playLabel.height;
+  lbl.getContext('2d').drawImage(Sprites.playLabel, 0, 0);
+
+  $('#btn-play').addEventListener('click', () => {
+    if (state.scene !== 'campaign') return;
+    UI.pressFx($('#btn-play'));
+    Reactions.applyCampaign();
+    Sound.play('play');
+    Scenes.go('world');
+  });
+  $('#btn-back').addEventListener('click', () => {
+    if (state.scene !== 'world') return;
+    UI.pressFx($('#btn-back'));
+    Sound.play('back');
+    Scenes.go('campaign');
+  });
+  $('#btn-mute').addEventListener('click', () => { Sound.unlock(); Sound.setMuted(!Sound.muted); });
+
+  // Audio may only start after the first user interaction.
+  const unlock = () => Sound.unlock();
+  document.addEventListener('pointerdown', unlock, { passive: true });
+  document.addEventListener('keydown', unlock);
+  document.addEventListener('touchstart', () => {}, { passive: true });   // enables :active on iOS
+
+  window.addEventListener('resize', () => { needsResize = true; });
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', () => { needsResize = true; });
+
+  Scenes.start('campaign');
+  onResize();
+  needsResize = false;
+  Scenes.render();
+  document.body.classList.remove('booting');
+  requestAnimationFrame(frame);
+
+  // Prebuild clouds once the first frame is out.
+  setTimeout(() => Clouds.build(), 50);
+
+  // Font check: if the pixel font is unavailable, fall back to monospace sizing.
+  if (document.fonts && document.fonts.load) {
+    const timeout = new Promise(res => setTimeout(() => res(null), 4000));
+    Promise.race([document.fonts.load('16px "Pixelify Sans"', 'ŇÁŘĚÍŮ'), timeout])
+      .then(list => { if (!list || !list.length) document.body.classList.add('font-fallback'); })
+      .catch(() => document.body.classList.add('font-fallback'));
+  }
+}
+
+// Debug / extension hook for later phases.
+window.MojeKampan = { CONFIG, PALETTE, CATEGORIES, TOPICS, ACTORS, state, Reactions, Scenes, moodBand };
+
+boot();
+</script>
+</body>
+</html>
